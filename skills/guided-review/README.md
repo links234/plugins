@@ -36,10 +36,12 @@ them:
   republishes the guide for the new head. `c` hides the margin. Without a Claude session to send to, Send copies the
   comments for the chat. On a narrow screen the boxes sit in the code instead.
 - **Comment threads**: a sent comment stays as a thread, with Claude's answer. Reply in it to keep the conversation
-  going. Each thread has a Claude agent of its own, a background subagent that reads its code, answers and makes its
-  changes, so one thread's work stays out of the others'; the session that published the page keeps a ledger of every
-  thread, and settles once a problem or a design choice that several share. The bell in the bar lists the answers you have not read; click one to go to it. As on GitHub, a thread follows its code to a new head, is marked **Outdated** when that code is gone, and
-  folds away when resolved.
+  going. Files and lines named in a thread link to their code, as in the chapter text, whoever wrote them, and so does
+  each symbol Claude writes as a ref. Each thread has a Claude agent of its own, a background subagent that reads its
+  code, answers and makes its changes, so one thread's work stays out of the others'; the session that published the
+  page keeps a ledger of every thread, and settles once a problem or a design choice that several share. The bell in
+  the bar lists the answers you have not read; click one to go to it. As on GitHub, a thread follows its code to a new
+  head, is marked **Outdated** when that code is gone, and folds away when resolved.
 - **Uncommitted changes**: review the working tree without a commit. gather takes a snapshot of it, staged, unstaged
   and untracked files, and leaves your files, index and refs as they are. Claude's changes land in the working tree, and
   nothing is committed.

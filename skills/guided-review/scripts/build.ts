@@ -391,6 +391,7 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     data: {
       id, prefix: P, key: `gr:${pr.number ?? branch ?? diff.snapshotOf ?? diff.head}`, number: pr.number ?? null, title: pr.title, head: diff.head,
       ...(pr.readOnly ? { mode: 'read-only' as const } : diff.snapshotOf ? { mode: 'uncommitted' as const } : {}),
+      ...(repoUrl ? { blob: `${repoUrl}/blob/${linkRev}/` } : {}),
       chapters: chapters.map((c, i) => ({ id: c.id, title: c.title, files: sel[i] ?? [] })), files: diff.files, diagrams: drawings,
     },
   };

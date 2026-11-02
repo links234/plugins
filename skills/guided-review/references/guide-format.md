@@ -88,6 +88,12 @@ A state table lays out the cases a change decides between, one row per case, wit
 `[text](https://…)`, and `[text](ref:path:line)` for a link that jumps to a line of the diff (or to GitHub, for an
 unchanged file). Name functions, types and fields in backticks.
 
+The text of a comment thread takes the same subset, and the page reads it when it draws the thread. It also links what
+plain text names: an `https://` link; a changed file by its path, or by as much of it as names one file (`src/a.ts`,
+`a.ts:31`, `a.ts:31-33`, `a.ts:12 (old)`); and `folder/file.ext:line` for a file the pull request does not change,
+which opens GitHub. Anything else stays text. Build checks a chapter's refs; nothing checks a thread's, so a ref written
+in one needs its file to exist. A line number stays the one it was written with when the code moves.
+
 ## stack.json
 
 Several pull requests on one page: a stack, or any set to review together. `build.ts --stack=<path>` reads it.

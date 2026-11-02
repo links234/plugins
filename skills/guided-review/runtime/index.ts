@@ -88,9 +88,11 @@ document.addEventListener('click', (e) => {
   if (t.dataset.chapterGo) { show('guide'); const el = byOwnId(c, `c-${t.dataset.chapterGo}`); if (el) pin(el); return; }
   if (t.dataset.ref) {
     e.preventDefault();
-    // The chapter a ref belongs to: the one it is written in.
+    // The chapter a ref belongs to: the one it is written in. On the Diff tab only a comment holds a ref, and it stays
+    // on that tab. Ask the view, not the link: the click marks an answer read, which draws its thread again.
     const ch = t.closest<HTMLElement>('.gr-sec')?.dataset.chapter ?? null;
-    void jump(c, t.dataset.ref, Number(t.dataset.line) || 0, (t.dataset.side as 'o' | 'n') || 'n', ch, t);
+    const from = view() === 'diff' ? diffOf(c) : t;
+    void jump(c, t.dataset.ref, Number(t.dataset.line) || 0, (t.dataset.side as 'o' | 'n') || 'n', ch, from);
     return;
   }
   if (t.dataset.goto) toCard(c, t.dataset.goto, t.dataset.in === 'diff' ? diffOf(c) : t.closest('.gr-sec'));

@@ -143,6 +143,8 @@ export interface PagePr {
   /** What a send may do, named in its text; left out when Claude drives a branch. "uncommitted": it changes the working
       tree and commits nothing. "read-only": it answers and changes no code. */
   mode?: 'uncommitted' | 'read-only';
+  /** Where a file the pull request does not change is on GitHub: the start of its URL. Left out with no repository. */
+  blob?: string;
   chapters: PageChapter[];
   files: DiffFile[];
   /** Each section's diagram, drawn at build: by "overview" or "c-<chapter id>". */

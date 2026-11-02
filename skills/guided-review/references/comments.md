@@ -166,8 +166,13 @@ main session keeps a ledger of every thread, settles what several share, and put
    same user id as the send's path) with a fresh `doc_id` such as `m` and the time in base 36, and these fields:
 
    ```json
-   { "thread": "<the comment's id, or a reply's thread>", "by": "claude", "text": "A 429 now waits for Retry-After when the endpoint sends one (deliver.ts 31-38).", "at": "2026-10-28T15:04:00.000Z", "head": "9e1f0c2" }
+   { "thread": "<the comment's id, or a reply's thread>", "by": "claude", "text": "A 429 now waits for Retry-After in [`retryable`](ref:src/webhooks/deliver.ts:31), when the endpoint sends one.", "at": "2026-10-28T15:04:00.000Z", "head": "9e1f0c2" }
    ```
+
+   `text` is written as a chapter's text is ([guide-format.md](guide-format.md#text)), so link every file, line and
+   symbol you name, on the head you answer for: a reader who reads an answer should reach its code in one click. Check
+   that each file exists at that head first, because a ref to a file the pull request does not change opens GitHub.
+   Write a file of another repository without a ref, or as an `https://` link.
 
    `at` is the time now, from `date -u +%Y-%m-%dT%H:%M:%S.000Z` (the page orders a thread's messages by it, so a
    guessed time puts an answer before the reply it answers), and `head` the branch's head after the changes. Add `"resolved": true` when the comment asked
@@ -218,7 +223,8 @@ user asks. It makes a **pending review**: a draft on the pull request that only 
 
 1. List the comments: `ArtifactData` `list` of `comments/<user id>/sends`, with `out_dir` `<work>`. Take the reader's
    own words from the threads still open, not Claude's answers. Show the user the list, and post only what they pick.
-2. Write `<work>/review.json`. `commit_id` is the page's full head:
+2. Write `<work>/review.json`. `commit_id` is the page's full head. GitHub cannot read a `ref:` link, so write each
+   `[text](ref:path:line)` as `text` (`path:line`):
 
    ```json
    {

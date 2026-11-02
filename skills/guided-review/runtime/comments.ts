@@ -33,6 +33,7 @@ import { toast } from '../kit/web/toast';
 import { split } from './dom';
 import { type CardState, allDrawn, cards, findRow, mount, previewOn, redrawNotes, rowOf, select, setFold } from './cards';
 import { reveal as revealProse } from './prose';
+import { plainText, richText } from './rich';
 import { type Ctx, active, ctxOf, ctxs, diffOf, guideOf } from './ctx';
 import { choose, pin, renderDiff, show, view } from './nav';
 import { type Post, type Target, type Thread, authorOf, codeOf, keepLocal, mark, newId, onThreads, outgoing, placeOf, refFor, rowAt, rowsOf, saveSend, startThreads, threadOf, threadsOf, watchThreads } from './threads';
@@ -486,7 +487,7 @@ function paintNote(el: HTMLElement, cm: ReviewComment) {
       btn(sendWord(), { 'data-note-now': cm.id, title: sendTitle('this comment') }),
       btn('Delete', { 'data-note-del': cm.id, 'aria-label': 'Delete comment', title: 'Delete' }, ICON.x)),
     c && showsCode({ key: '', c, cm, at }) ? codeBlock(cm.code!) : null,
-    h('p', { class: 'gr-note-text', text: cm.text }));
+    noteText(c ?? active(), cm.text));
 }
 
 // ---------------------------------------------------------------- threads
@@ -501,22 +502,23 @@ const when = (iso: string) => {
   const d = new Date(iso);
   return Number.isNaN(+d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
-function postEl(p: Post, threadHead: string) {
+const noteText = (c: Ctx, text: string) => h('p', { class: 'gr-note-text' }, richText(c, text));
+function postEl(c: Ctx, p: Post, threadHead: string) {
   const fresh = p.by === 'claude' && !read.has(p.id);
   return h('li', { class: `gr-post${p.by === 'claude' ? ' is-claude' : ''}${fresh ? ' is-unread' : ''}` },
     h('div', { class: 'gr-post-by' }, h('b', { text: authorOf(p.by, p.uid) }), h('time', { datetime: p.at, text: when(p.at) }),
       p.by === 'claude' && p.head && p.head !== threadHead ? h('span', { class: 'gr-post-head', title: 'The head commit it answers on', text: p.head.slice(0, 7) }) : null,
       fresh ? h('span', { class: 'gr-chip is-new', text: 'New' }) : null),
-    h('p', { class: 'gr-note-text', text: p.text }));
+    noteText(c, p.text));
 }
-function pendingPost(el: HTMLElement, r: ReviewComment) {
+function pendingPost(c: Ctx, el: HTMLElement, r: ReviewComment) {
   if (editingHere(el, r.id)) return h('li', { class: 'gr-post is-editing', 'data-note-id': r.id }, editing!.form);
   return h('li', { class: 'gr-post is-pending', 'data-note-id': r.id },
     h('div', { class: 'gr-post-by' }, h('b', { text: 'You' }), h('span', { class: 'gr-chip is-pending', text: 'Queued' }), h('span', { class: 'gr-spacer' }),
       btn('Edit', { 'data-note-edit': r.id }),
       btn(sendWord(), { 'data-note-now': r.id, title: sendTitle('this reply') }),
       btn('Delete', { 'data-note-del': r.id, 'aria-label': 'Delete reply', title: 'Delete' }, ICON.x)),
-    h('p', { class: 'gr-note-text', text: r.text }));
+    noteText(c, r.text));
 }
 /** A thread: where it is, its comment and what came after, the replies waiting to be sent, and its Reply box. A
     resolved one folds to one line until the reader opens it. */
@@ -539,7 +541,7 @@ function paintThread(el: HTMLElement) {
   ];
   if (folded) {
     keepTyping(el, () => fill(el, h('div', { class: 'gr-note-head' }, what, ...chips,
-      h('span', { class: 'gr-thread-gist', text: firstLine(t.posts.at(-1)?.text ?? t.cm.text) }), btn('Show', { 'data-thread-fold': t.id }))));
+      h('span', { class: 'gr-thread-gist', text: firstLine(plainText(t.posts.at(-1)?.text ?? t.cm.text)) }), btn('Show', { 'data-thread-fold': t.id }))));
     return;
   }
   const code = showsCode({ key: '', c: t.c, cm: t.cm, at, t }) ? codeBlock(t.cm.code!) : null;
@@ -549,8 +551,8 @@ function paintThread(el: HTMLElement) {
       t.resolved ? btn('Hide', { 'data-thread-fold': t.id }) : null, btn(t.resolved ? 'Reopen' : 'Resolve', { 'data-thread-resolve': t.id })),
     code,
     h('ol', { class: 'gr-posts' },
-      postEl({ id: t.id, by: 'reader', uid: t.uid, text: t.cm.text, at: t.cm.at, head: t.cm.head }, t.cm.head),
-      ...t.posts.map((p) => postEl(p, t.cm.head)), ...pending.map((r) => pendingPost(el, r))),
+      postEl(t.c, { id: t.id, by: 'reader', uid: t.uid, text: t.cm.text, at: t.cm.at, head: t.cm.head }, t.cm.head),
+      ...t.posts.map((p) => postEl(t.c, p, t.cm.head)), ...pending.map((r) => pendingPost(t.c, el, r))),
     h('div', { class: 'gr-thread-reply' }, reply)));
 }
 function codeBlock(code: NonNullable<ReviewComment['code']>) {
@@ -771,8 +773,8 @@ function paintInbox(list = unread()) {
         h('b', { text: t.cm.path ? split(t.cm.path)[0] : 'The pull request' }),
         t.cm.kind === 'general' ? null : h('span', { text: placeLabel(placeOf(t.c, t.cm) ?? t.cm) }),
         h('time', { datetime: last.at, text: when(last.at) })),
-      h('span', { class: 'ask', text: firstLine(t.cm.text, 90) }),
-      h('span', { class: 'gist' }, h('b', { text: 'Claude ' }), last.text),
+      h('span', { class: 'ask', text: firstLine(plainText(t.cm.text), 90) }),
+      h('span', { class: 'gist' }, h('b', { text: 'Claude ' }), plainText(last.text)),
       posts.length > 1 ? h('span', { class: 'more', text: `${posts.length} new answers` }) : null);
   };
   box.replaceChildren(

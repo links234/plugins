@@ -335,6 +335,7 @@ check('a snapshot says what it was written for, with no link GitHub cannot serve
 check('a ref to an unchanged file links to the base', localPage.html.includes(`https://github.com/example/tree/blob/${treeTip}/src/c.rs#L2`), localPage.html);
 check('a Markdown link names the base, not the snapshot', localPage.data.includes(`https://github.com/example/tree/blob/${treeTip}/src/a.rs`) && !localPage.data.includes(`/blob/${alone.diff.head}`));
 check('the page knows a send is on uncommitted changes', localPage.data.includes('"mode":"uncommitted"'));
+check('a thread\'s link to an unchanged file names the base, not the snapshot', localPage.data.includes(`"blob":"https://github.com/example/tree/blob/${treeTip}/"`));
 const owned = buildTree(treeGuide({ title: 'A local change', readOnly: true }), 'owned');
 check('build refuses a read-only snapshot', owned.status === 1 && /pr\.readOnly is for someone else/.test(owned.log), owned.log);
 const clean = bun('gather.ts', ['--base=HEAD', '--worktree', `--out=${join(tmp, 'clean.json')}`]);
@@ -1000,7 +1001,54 @@ async function runThreads(file: string) {
       fails.querySelector('[data-composer-send]').click();
       await sleep(100);
       const back = boxesWith('Will this go?');
-      r.failed = back.length + ' ' + !back[0]?.classList.contains('gr-thread') + ' ' + !!back[0]?.querySelector('.gr-chip.is-pending') + ' ' + $('[data-note-send]').textContent + ' ' + sent.length;`));
+      r.failed = back.length + ' ' + !back[0]?.classList.contains('gr-thread') + ' ' + !!back[0]?.querySelector('.gr-chip.is-pending') + ' ' + $('[data-note-send]').textContent + ' ' + sent.length;
+      // an answer reads as a chapter does: what it names links to its code, and nothing in it runs
+      const shown = document.querySelector('.gr-margin > .gr-thread:not(.is-folded)');
+      const shownId = shown.dataset.threadId;
+      put('comments/u_me/msgs/m9', { thread: shownId, by: 'claude', at: new Date().toISOString(), head: 'c2c2c2c',
+        text: 'See [\`retryable\`](ref:src/webhooks/deliver.ts:31), sign.ts:3, **src/webhooks/backoff.ts**, \`queue.ts\`, src/log.ts:2 and [the log](ref:src/log.ts).\\nNot ours: .github/workflows/build.yml, https://example.com/a.ts:1, v1.2.3, <img src=x onerror="window.__rich=1"> [bad](javascript:window.__rich=1) [[x.ts:1](ref:y)] *em*' });
+      const answerP = () => [...(box('t:' + shownId)?.querySelectorAll('.gr-post.is-claude .gr-note-text') ?? [])].find((p) => p.textContent.startsWith('See '));
+      await until(answerP);
+      const head = window.GR_DATA.prs[0].head;
+      r.richLinks = [...answerP().querySelectorAll('a')].map((a) => (a.dataset.ref ? a.dataset.ref + ':' + a.dataset.line + a.dataset.side : a.getAttribute('href').replace(head, 'HEAD'))).join(' ');
+      r.richMarks = [answerP().querySelector('b a')?.dataset.ref, answerP().querySelector('a[data-ref="src/webhooks/queue.ts"] code')?.textContent, answerP().querySelector('em')?.textContent, !answerP().querySelector('a a'), !answerP().querySelector('img'), window.__rich === undefined, answerP().textContent.includes('<img src=x')].join();
+      $('[data-bell]').click();
+      r.richGist = [...document.querySelectorAll('.gr-inbox-item .gist')].map((g) => g.textContent).find((g) => g.startsWith('Claude See'))?.slice(0, 66);
+      $('[data-bell]').click();
+      const selected = (scope, line) => [...document.querySelectorAll(scope + ' .gr-file')].some((f) => f.querySelector('diffs-container')?.shadowRoot?.querySelector('[data-line="' + line + '"][data-selected-line]'));
+      answerP().querySelector('a[data-ref="src/webhooks/deliver.ts"]').click();
+      r.richJump = await until(() => !$('.gr-guide').hidden && selected('.gr-guide', 31));
+      // a ref in a thread on lines goes to what it names: the thread does not take the card's selection back
+      await sleep(2000);
+      put('comments/u_me/msgs/m10', { thread: 'tsame', by: 'claude', at: new Date().toISOString(), head: 'c2c2c2c', text: 'Compare src/webhooks/deliver.ts:35 with webhooks/deliver.ts:36, not deliver.ts:37, which two files could be.' });
+      await until(() => box('t:tsame')?.querySelector('.gr-post.is-unread a[data-line="35"]'));
+      box('t:tsame').querySelector('a[data-line="35"]').click();
+      await until(() => row(35)?.matches('[data-selected-line]'));
+      await sleep(300);
+      r.richLine = [row(35)?.matches('[data-selected-line]'), row(31)?.matches('[data-selected-line]'), box('t:tsame').classList.contains('is-active'), !!box('t:tsame').querySelector('.is-unread')].join();
+      r.richAmbiguous = [...box('t:tsame').querySelectorAll('.gr-post.is-claude a')].map((a) => a.dataset.line).join();
+      // on the Diff tab it stays on the Diff tab, even when the click repaints an unread answer
+      put('comments/u_me/msgs/m11', { thread: shownId, by: 'claude', at: new Date().toISOString(), head: 'c2c2c2c', text: 'Then src/webhooks/sign.ts:4.' });
+      await until(() => box('t:' + shownId)?.querySelector('.gr-post.is-unread a[data-line="4"]'));
+      $('.gr-tab[data-view="diff"]').click();
+      await sleep(200);
+      box('t:' + shownId).querySelector('.gr-post.is-unread a[data-line="4"]').click();
+      r.richUnread = await until(() => !$('.gr-diff').hidden && selected('.gr-diff', 4));
+      await sleep(2000);
+      answerP().querySelector('a[data-ref="src/webhooks/sign.ts"]').click();
+      r.richStays = await until(() => !$('.gr-diff').hidden && selected('.gr-diff', 3));`));
+    // Narrower, there is no margin: a thread sits in the code, and its links work the same.
+    await tab.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 900, deviceScaleFactor: 1, mobile: false });
+    take(await inPage(tab, `await sleep(300); ${helpers}
+      $('.gr-tab[data-view="guide"]').click();
+      $('#c-retry-decision').scrollIntoView();
+      const inCode = () => document.querySelector('.gr-file [data-key="t:tsame"]');
+      await until(inCode);
+      await sleep(2000);
+      const link = inCode()?.querySelector('a[data-line="36"]');
+      r.narrowLink = !!link && getComputedStyle(link).textDecorationStyle;
+      link?.click();
+      r.narrowJump = await until(() => row(36)?.matches('[data-selected-line]'));`));
   } catch (e) {
     console.log(`fail  ${name}: ${(e as Error).message}`);
     failed++;
@@ -1014,6 +1062,9 @@ async function runThreads(file: string) {
     bellGo: 'true,true,true,true,true,true', inboxEmpty: true, inboxClosed: true, sendWord: 'Send 1to Claude', sentRef: true, sentThread: true, mineShows: 'You', answer: 'You,Claude Capped at an hour (backoff.ts:12).', answerToast: 'Claude answered in a thread.',
     replyWord: 'Send', replyText: true, replyDoc: 'reply true Is the backoff capped? claude', replyShows: true, mark: true,
     flying: '1 true true', landed: true, failed: '1 true true Send 1to Claude 3',
+    richLinks: 'src/webhooks/deliver.ts:31n src/webhooks/sign.ts:3n src/webhooks/backoff.ts:0n src/webhooks/queue.ts:0n https://github.com/example/webhooks/blob/HEAD/src/log.ts#L2 https://github.com/example/webhooks/blob/HEAD/src/log.ts https://example.com/a.ts:1 https://github.com/example/webhooks/blob/HEAD/y',
+    richMarks: 'src/webhooks/backoff.ts,queue.ts,em,true,true,true,true', richGist: 'Claude See retryable, sign.ts:3, src/webhooks/backoff.ts, queue.ts', richJump: true, richStays: true,
+    richLine: 'true,false,false,false', richAmbiguous: '35,36', richUnread: true, narrowLink: 'dotted', narrowJump: true,
   }, { look: BUDGET.interaction, bell: BUDGET.interaction });
 }
 

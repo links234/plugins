@@ -128,7 +128,7 @@ on:
 ```
 topic: <what the thread is about, in under ten words>
 asks: <each that applies: question, change, guide, unclear>
-answer: <what the reader sees in the thread on the page: a sentence or two, with path and line; the reasoning goes in change or user>
+answer: <what the reader sees in the thread on the page: a sentence or two, with each file, line and symbol as [`name`](ref:path:line); the reasoning goes in change or user>
 change: none | <each file to change, and what changes in it>
 changed: none | <each file this turn changed>
 checks: none | <what ran, and the result>
@@ -197,7 +197,7 @@ guide, and posts your answer in the thread on the page; you read the code, answe
 
    | The comment… | You |
    |---|---|
-   | asks a question | Answer it in `answer`, in a sentence or two, with the path and line. |
+   | asks a question | Answer it in `answer`, in a sentence or two, with a ref to the code. |
    | asks for a change to the code | Say what you would change in `change`. When told to make it, make it, run the repository's own checks for what you changed, and say in `answer` what you did. |
    | asks for a change, on someone else's pull request | Say in `answer` what to ask of the author, ready to post as a review comment. Leave `change` as `none`. |
    | says the guide is wrong or unclear | Write the fix in `guide`; the main session edits `guide.json`. |
