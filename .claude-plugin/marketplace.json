@@ -9,7 +9,7 @@
     {
       "name": "snowmead",
       "source": "./",
-      "version": "0.13.0",
+      "version": "0.14.0",
       "description": "Michael Assaf's skills for Claude: thinkr (plan and explainer pages as Artifacts), guided-review (guided code reviews as Artifacts), changelog (a team changelog as an Artifact, posted to Slack), rust (Effective Rust) and review (a Claude code review of a branch, locally or as a GitHub Action on each pull request).",
       "category": "productivity",
       "tags": ["artifacts", "plan", "explainer", "code-review", "pull-request", "changelog", "slack", "rust", "github-actions"]

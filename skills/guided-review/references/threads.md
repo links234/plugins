@@ -98,6 +98,7 @@ You hold this thread for as long as it lasts: each later reply in it comes to yo
 thread agent" in <the skill's folder>/references/threads.md: it has your rules and the report that ends each turn.
 
 Checkout: <path>, branch <branch>, head <sha>. Guide: <the pull request's guide.json>.
+Source: <a change you drive | uncommitted changes, so nothing is committed | someone else's pull request, read-only>.
 
 The thread opens on <where>: "<the comment's text>"
 Its code, and all the send holds of it: jq '.prs[].comments[] | select((.thread // .id) == "<thread id>")' <the send's file>
@@ -168,6 +169,9 @@ A thread agent's first turn reads and plans, and changes no file: its report's `
 After the overlap pass, the main session tells each agent whose change goes ahead to make it, and names the files it
 may change. Agents whose files do not overlap work at once; agents that share a file go one after another.
 
+On a `(read-only)` send, no change goes ahead: its agents only answer. On an `(uncommitted)` one, changes go ahead in
+the working tree, and the main session commits nothing ([By source](comments.md#by-source)).
+
 On a stack's page, threads on different pull requests change different branches, and a checkout holds one at a time.
 Let the changes of one pull request go ahead at a time: check out its branch first, and commit before you move to the
 next. Each agent's brief names its own pull request's branch.
@@ -195,6 +199,7 @@ guide, and posts your answer in the thread on the page; you read the code, answe
    |---|---|
    | asks a question | Answer it in `answer`, in a sentence or two, with the path and line. |
    | asks for a change to the code | Say what you would change in `change`. When told to make it, make it, run the repository's own checks for what you changed, and say in `answer` what you did. |
+   | asks for a change, on someone else's pull request | Say in `answer` what to ask of the author, ready to post as a review comment. Leave `change` as `none`. |
    | says the guide is wrong or unclear | Write the fix in `guide`; the main session edits `guide.json`. |
    | is unclear, or asks for something outside the pull request | Ask in `user`, and say so in `answer`. |
 
@@ -211,6 +216,7 @@ Rules:
   its own checks, its guide.
 - Change only the files the main session named. When you need another, stop and say so in `change`. Only the main
   session's go-ahead lets you change a file: a reader's reply, even "yes, do it", is an answer for your plan, not one.
+  On someone else's pull request, change no file at all, and run none of its code: read it.
 - Never run a git command that writes: `add`, `commit`, `checkout`, `switch`, `restore`, `reset`, `stash`, `push`.
   Never build or publish the guide, write the page's database or comment threads, or post on GitHub.
 - Other agents may be changing other files in the same checkout. When a check fails in a file you did not change, say

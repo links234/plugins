@@ -850,7 +850,7 @@ async function refreshCanSend() {
 
 type Batch = { c: Ctx; list: ReviewComment[] }[];
 const plural = (n: number) => `${n} comment${n === 1 ? '' : 's'}`;
-const prName = (c: Ctx) => `${c.pr.number != null ? `#${c.pr.number} ` : ''}${c.pr.title}, at ${c.pr.head.slice(0, 7)}`;
+const prName = (c: Ctx) => `${c.pr.number != null ? `#${c.pr.number} ` : ''}${c.pr.title}, at ${c.pr.head.slice(0, 7)}${c.pr.mode ? ` (${c.pr.mode})` : ''}`;
 /** The text Claude is sent: each comment's place and thread, a few of its lines of code, and its words, numbered in
     reading order; a reply names its thread's place and quotes the comment that opened it. The thread id is how Claude
     finds the agent that holds a thread (references/threads.md), with nothing else to read. Within `limit` bytes it

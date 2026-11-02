@@ -8,7 +8,7 @@ the diff. [`../examples/demo.guide.json`](../examples/demo.guide.json) uses ever
 
 | Field | Required | What it holds |
 |---|---|---|
-| `pr` | yes | `title`; `number` and `url` together, or neither for a branch with no pull request; optional `author` (GitHub login), `base` (branch name), `head` (branch name). Copy them from GitHub. |
+| `pr` | yes | `title`; `number` and `url` together, or neither for a branch with no pull request or for uncommitted changes; optional `author` (GitHub login), `base` (branch name), `head` (branch name). Copy them from GitHub, or from the `pr` line `gather.ts --pr` prints. `readOnly`: `true` for someone else's pull request, so the page and its sends say that Claude answers and changes no code. |
 | `name` | no | The page's name in the browser tab and the artifact gallery, 2 to 4 words, such as "Webhook retries review". Defaults to "Guided review #<number>", or "Review of <branch>" with no pull request. |
 | `diffStyle` | no | `"unified"` (default) to show each change in one column, or `"split"` to show old and new side by side. It is where cards start: each reader can switch with the Unified / Split control in the bar, and the page remembers their choice. Screens under 860 px wide always show one column. Pick `split` when most changes rewrite lines in place rather than add or remove whole blocks. |
 | `links` | no | Buttons in the top bar, `[{ "label": "Video", "href": "https://…" }]`. Link the pull request's video and anything else the reader checks the change with. `https://` only. |

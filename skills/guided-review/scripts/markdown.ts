@@ -32,7 +32,11 @@ const ALIKE = 0.4;
 export const isMarkdown = (f: DiffFile) => /\.(md|markdown)$/i.test(f.path) && !f.binary && f.kind !== 'generated';
 
 /** Where the pull request is: links and images resolve against its repository, at its base or its head. */
-export interface Where { repo: string; base: string; head: string; checkout: string }
+export interface Where {
+  repo: string; base: string; head: string; checkout: string;
+  /** The commit links go to on GitHub: the head, unless it is a snapshot only this machine holds. */
+  link: string;
+}
 type Sanitize = ((html: string, o: IOptions) => string) & { defaults: IOptions };
 let md: InstanceType<typeof MarkdownIt> | null = null, sanitize: Sanitize | null = null;
 /** The renderer and the sanitizer, loaded once. */
@@ -166,7 +170,7 @@ function link(attribs: Record<string, string>, ctx: Ctx): Record<string, string>
   const path = href && resolvePath(href, ctx);
   if (!path || !ctx.at.repo) return out;
   const hash = href.includes('#') ? `#${href.split('#')[1]}` : '';
-  return { ...out, href: `${ctx.at.repo}/blob/${ctx.at.head}/${encodeURI(path)}${hash}`, target: '_blank', rel: 'noopener' };
+  return { ...out, href: `${ctx.at.repo}/blob/${ctx.at.link}/${encodeURI(path)}${hash}`, target: '_blank', rel: 'noopener' };
 }
 /** An image: one of the repository's, embedded while the page's budget lasts; any other, a link to it. */
 function image(attribs: Record<string, string>, ctx: Ctx): { tagName: string; attribs: Record<string, string>; text?: string } {

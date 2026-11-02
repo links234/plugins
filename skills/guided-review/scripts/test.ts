@@ -4,13 +4,14 @@
      bun scripts/test.ts        # needs git, Chrome and the network; set CHROME when it is not in a usual place
 
    1. scripts: gather.ts and build.ts against a scratch repository: the diff GitHub shows, kinds, scope labels,
-      emptied, deleted, renamed, binary and moved code, refs, escaping, and every check that refuses a guide.
+      emptied, deleted, renamed, binary and moved code, refs, escaping, and every check that refuses a guide. Then a
+      snapshot of a working tree, and a pull request read from a stand-in for GitHub.
    2. page: builds the demo (scripts/demo.ts) and drives it in headless Chrome over DevTools: what the reader sees
       after each action, review comments (the gutter's "+" dragged with real mouse events, the margin, the sends, the
       threads sent comments leave, outdated ones, and the page database through a stand-in for the viewer), no
       console errors, and timing budgets (boot ≤ 30 ms, each interaction ≤ 12 ms, a redraw of the cards on screen ≤
       one frame). */
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Diff, DiffFile, Guide } from '../runtime/types';
@@ -34,8 +35,8 @@ mkdirSync(repo);
 const put = (path: string, text: string | Uint8Array) => { mkdirSync(dirname(join(repo, path)), { recursive: true }); writeFileSync(join(repo, path), text); };
 const read = (path: string) => readFileSync(join(repo, path), 'utf8');
 const lines = (n: number, f: (i: number) => string) => Array.from({ length: n }, (_, i) => f(i + 1)).join('\n') + '\n';
-const bun = (script: string, args: string[], cwd = repo) => {
-  const p = Bun.spawnSync(['bun', join(ROOT, 'scripts', script), ...args], { cwd, stdout: 'pipe', stderr: 'pipe' });
+const bun = (script: string, args: string[], cwd = repo, env?: Record<string, string>) => {
+  const p = Bun.spawnSync(['bun', join(ROOT, 'scripts', script), ...args], { cwd, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } });
   return { status: p.exitCode, log: p.stdout.toString() + p.stderr.toString() };
 };
 
@@ -260,6 +261,142 @@ const twice = buildStack([guideFor('One.'), guideFor('One.')]);
 check('build refuses a stack that lists a pull request twice', twice.status === 1 && /lists #1 2 times/.test(twice.log), twice.log);
 const tagged = buildStack([guideFor('One.'), { ...second, chapters: second.chapters.slice(1) }]);
 check('a stack\'s errors name their pull request', tagged.status === 1 && /error #2: src\/a\.rs hunk 1 .* is in no chapter/.test(tagged.log), tagged.log);
+
+// A working tree. Signing fails here, so a snapshot that tried to sign would fail too: on the machines this runs on,
+// a signature waits for a touch on a hardware key.
+const tree = join(tmp, 'tree');
+mkdirSync(join(tree, 'src'), { recursive: true });
+const putT = (path: string, text: string) => writeFileSync(join(tree, path), text);
+const commitT = (message: string) => { git(tree, 'add', '-A'); git(tree, 'commit', '-qm', message); return git(tree, 'rev-parse', 'HEAD').trim(); };
+git(tree, 'init', '-q', '-b', 'main');
+git(tree, 'remote', 'add', 'origin', 'https://github.com/example/tree.git');
+git(tree, 'config', 'commit.gpgsign', 'true');
+git(tree, 'config', 'gpg.program', 'false');
+putT('.gitignore', '*.log\n');
+putT('README.md', '# Tree\n\nSee [the code](src/a.rs).\n');
+putT('src/a.rs', 'fn a() {\n    1\n}\n');
+putT('src/c.rs', 'fn c() {\n    3\n}\n');
+commitT('base');
+git(tree, 'checkout', '-qb', 'work');
+putT('src/b.rs', 'fn b() {\n    2\n}\n');
+const treeTip = commitT('a commit on the branch');
+putT('src/a.rs', 'fn a() {\n    10\n}\n'); // changed, not staged
+putT('src/s.rs', 'fn s() {}\n');
+git(tree, 'add', 'src/s.rs'); // new, staged
+putT('src/new.rs', 'fn new() {}\n'); // new, untracked
+putT('README.md', '# Tree\n\nSee [the code](src/a.rs), now.\n');
+putT('debug.log', 'ignored\n');
+putT('secret.txt', 'left out\n');
+const treeState = () => [git(tree, 'status', '--porcelain=v1'), git(tree, 'diff', '--cached', '--name-only'), git(tree, 'for-each-ref'), git(tree, 'stash', 'list')];
+const before = treeState();
+const treeDiffPath = join(tmp, 'tree.json');
+const gatherTree = (...args: string[]) => {
+  const r = bun('gather.ts', [...args, `--out=${treeDiffPath}`], tree);
+  return { ...r, diff: (r.status === 0 ? JSON.parse(readFileSync(treeDiffPath, 'utf8')) : { files: [] }) as Diff };
+};
+const paths = (d: Diff) => d.files.map((f) => f.path).sort();
+const alone = gatherTree('--base=HEAD', '--worktree', '--exclude=secret.txt');
+check('a snapshot gathers', alone.status === 0, alone.log);
+same('a snapshot holds staged, unstaged and untracked changes, and no ignored or excluded file', paths(alone.diff), ['README.md', 'src/a.rs', 'src/new.rs', 'src/s.rs']);
+same('a snapshot sits on HEAD', [alone.diff.snapshotOf, alone.diff.base], [treeTip, treeTip]);
+same('a snapshot is in no commit list', alone.diff.commits, []);
+same('uncommitted changes read as sitting on their branch', [alone.diff.baseRef, alone.diff.branch], ['work', 'uncommitted changes']);
+same('a snapshot leaves the index, the files and the refs as they were', treeState(), before);
+check('the outline marks untracked files', /src\/new\.rs  added  \+1 -0  untracked/.test(alone.log), alone.log);
+same('the same files give the same snapshot', gatherTree('--base=HEAD', '--worktree', '--exclude=secret.txt').diff.head, alone.diff.head);
+const keptPath = join(tmp, 'kept.json');
+const keptOut = (...args: string[]) => {
+  const r = bun('gather.ts', ['--base=HEAD', '--worktree', ...args, `--out=${keptPath}`], tree);
+  return { ...r, diff: JSON.parse(readFileSync(keptPath, 'utf8')) as Diff };
+};
+const leftOut = keptOut('--exclude=secret.txt', '--exclude=src/a.rs');
+same('an excluded tracked file stays as committed', paths(leftOut.diff), ['README.md', 'src/new.rs', 'src/s.rs']);
+check('the outline names what was left out', leftOut.log.includes('Left out: secret.txt, src/a.rs.'), leftOut.log);
+same('a path left out stays out when gather writes the same diff.json again', paths(keptOut().diff), ['README.md', 'src/new.rs', 'src/s.rs']);
+const whole = gatherTree('--base=main', '--worktree', '--exclude=secret.txt');
+same('against a branch, a snapshot adds to what is committed', paths(whole.diff), ['README.md', 'src/a.rs', 'src/b.rs', 'src/new.rs', 'src/s.rs']);
+same('against a branch, the commits are the real ones', whole.diff.commits.map((c) => c.subject), ['a commit on the branch']);
+same('against a branch, the page keeps its names', [whole.diff.baseRef, whole.diff.branch], ['main', 'work']);
+
+const treeGuide = (pr: Guide['pr'], body = 'One.'): Guide => ({
+  pr, name: 'Local values review', overview: { summary: 'Changes a value.', diagram: dia('one') },
+  chapters: [{ id: 'all', title: 'All of it', body: [body], diagram: dia('all of it'), files: ['src/a.rs', 'src/new.rs', 'src/s.rs', 'README.md'] }],
+});
+const buildTree = (guide: Guide, stem: string) => {
+  const guidePath = join(tmp, `${stem}.guide.json`);
+  writeFileSync(guidePath, JSON.stringify(guide));
+  return bun('build.ts', [`--diff=${treeDiffPath}`, `--guide=${guidePath}`, `--out=${join(tmp, stem)}`], tree);
+};
+gatherTree('--base=HEAD', '--worktree', '--exclude=secret.txt');
+const local = buildTree(treeGuide({ title: 'A local change' }, 'See [the rest](ref:src/c.rs:2).'), 'tree');
+check('a snapshot builds', local.status === 0, local.log);
+const localPage = local.status === 0 ? page('tree') : { html: '', data: '' };
+check('a snapshot says what it was written for, with no link GitHub cannot serve', localPage.html.includes(`uncommitted changes on <span class="mono">${treeTip.slice(0, 7)}</span>`) && !localPage.html.includes('/commit/'));
+check('a ref to an unchanged file links to the base', localPage.html.includes(`https://github.com/example/tree/blob/${treeTip}/src/c.rs#L2`), localPage.html);
+check('a Markdown link names the base, not the snapshot', localPage.data.includes(`https://github.com/example/tree/blob/${treeTip}/src/a.rs`) && !localPage.data.includes(`/blob/${alone.diff.head}`));
+check('the page knows a send is on uncommitted changes', localPage.data.includes('"mode":"uncommitted"'));
+const owned = buildTree(treeGuide({ title: 'A local change', readOnly: true }), 'owned');
+check('build refuses a read-only snapshot', owned.status === 1 && /pr\.readOnly is for someone else/.test(owned.log), owned.log);
+const clean = bun('gather.ts', ['--base=HEAD', '--worktree', `--out=${join(tmp, 'clean.json')}`]);
+check('a clean working tree has nothing to review', clean.status === 1 && /nothing to review/.test(clean.log), clean.log);
+const contradict = bun('gather.ts', ['--worktree', '--head=pr']);
+check('gather refuses --worktree with --head', contradict.status === 1 && /takes no --head/.test(contradict.log), contradict.log);
+
+// Someone else's pull request. GitHub is a bare repository, with the ref it keeps for pull requests, and a gh that
+// knows one pull request. gather runs in another project's checkout, which it must not touch.
+const remote = join(tmp, 'remote.git');
+git(tmp, 'clone', '-q', '--bare', repo, remote);
+git(remote, 'config', 'uploadpack.allowFilter', 'true');
+git(remote, 'update-ref', 'refs/pull/7/head', 'refs/heads/pr');
+const tools = join(tmp, 'tools');
+mkdirSync(tools);
+writeFileSync(join(tools, 'gh'), `#!/bin/sh
+[ "$3" = "404" ] && { echo 'no pull requests found' >&2; exit 1; }
+echo '{"number":7,"url":"https://github.com/someone/else/pull/7","title":"Their change","author":{"login":"alice"},"baseRefName":"main","headRefName":"pr"}'
+`, { mode: 0o755 });
+const github = { PATH: `${tools}:${process.env.PATH}`, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.file://${remote}.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/someone/else.git' };
+const prPath = join(tmp, 'theirs', 'diff.json'), prClone = join(tmp, 'theirs', 'checkout');
+mkdirSync(dirname(prPath));
+const gatherPr = (...args: string[]) => bun('gather.ts', [...args, `--out=${prPath}`], tree, github);
+const beforePr = treeState();
+const theirs = gatherPr('--pr=https://github.com/someone/else/pull/7');
+check('gather reads a pull request', theirs.status === 0, theirs.log);
+const prDiff: Diff = theirs.status === 0 ? JSON.parse(readFileSync(prPath, 'utf8')) : ({ files: [] } as unknown as Diff);
+const prHead = git(repo, 'rev-parse', 'pr').trim();
+same('a pull request diffs from its merge base to its head', [prDiff.base, prDiff.head], [branchPoint, prHead]);
+same('a pull request keeps its own names', [prDiff.repo, prDiff.baseRef, prDiff.branch], ['https://github.com/someone/else', 'main', 'pr']);
+same('a pull request has its own clone, at its head', git(prClone, 'rev-parse', 'HEAD').trim(), prHead);
+check('gather prints what the guide needs', theirs.log.includes(`checkout ${prClone}`) && theirs.log.includes('"author":"alice"') && theirs.log.includes('"head":"pr"'), theirs.log);
+same('reading a pull request leaves the checkout it ran in as it was', treeState(), beforePr);
+const theirGuide = (readOnly: boolean): Guide => ({ ...guideFor('One.'), pr: { number: 7, title: 'Their change', url: 'https://github.com/someone/else/pull/7', author: 'alice', base: 'main', head: 'pr', ...(readOnly ? { readOnly } : {}) } });
+const buildPr = (guide: Guide, stem: string) => {
+  const guidePath = join(tmp, `${stem}.guide.json`);
+  writeFileSync(guidePath, JSON.stringify(guide));
+  return bun('build.ts', [`--diff=${prPath}`, `--guide=${guidePath}`, `--out=${join(tmp, stem)}`, `--repo=${prClone}`], tmp, github);
+};
+const prBuilt = buildPr(theirGuide(true), 'theirs-page');
+check('a guide of a pull request builds against its clone', prBuilt.status === 0, prBuilt.log);
+const prPage = prBuilt.status === 0 ? page('theirs-page') : { html: '', data: '' };
+check('the page says it is read-only', prPage.html.includes('>read-only</span>') && prPage.data.includes('"mode":"read-only"'));
+check('the page links to the pull request and its head', prPage.html.includes('https://github.com/someone/else/pull/7') && prPage.html.includes(`https://github.com/someone/else/commit/${prHead}`));
+const driven = buildPr(theirGuide(false), 'driven-page');
+check('a pull request you drive names no mode', driven.status === 0 && !page('driven-page').data.includes('"mode":'), driven.log);
+git(repo, 'checkout', '-q', 'pr');
+git(repo, 'commit', '--allow-empty', '-qm', 'a new head');
+git(remote, 'fetch', '-q', repo, '+refs/heads/pr:refs/pull/7/head');
+const moved = gatherPr('--pr=7');
+same('run again, gather moves to the new head', [moved.status, git(prClone, 'rev-parse', 'HEAD').trim()], [0, git(repo, 'rev-parse', 'HEAD').trim()]);
+const missing = gatherPr('--pr=404');
+check('gather says when gh cannot find the pull request', missing.status === 1 && /error gh pr view 404: no pull requests found/.test(missing.log), missing.log);
+const noGh = join(tmp, 'no-gh');
+mkdirSync(noGh);
+symlinkSync(process.execPath, join(noGh, 'bun'));
+const without = bun('gather.ts', ['--pr=7'], tmp, { PATH: noGh });
+check('gather says when gh is missing', without.status === 1 && /--pr needs gh/.test(without.log), without.log);
+const otherClone = gatherPr('--pr=7', `--checkout=${tree}`);
+check('gather refuses a clone of another repository', otherClone.status === 1 && /is a clone of https:\/\/github\.com\/example\/tree\.git/.test(otherClone.log), otherClone.log);
+const both = gatherPr('--pr=7', '--head=x');
+check('gather refuses --pr with --head', both.status === 1 && /takes no --base, --head or --worktree/.test(both.log), both.log);
 rmSync(tmp, { recursive: true, force: true });
 console.log(failed ? `fail  scripts (${failed})` : 'ok    scripts (gather and build against a scratch repository)');
 
@@ -605,11 +742,13 @@ async function runComments(file: string) {
       let copied = null;
       navigator.clipboard.writeText = (text) => { copied = text; return Promise.resolve(); };
       const queued = JSON.parse(localStorage.getItem('gr:42:comments'));
+      window.GR_DATA.prs[0].mode = 'read-only'; // read when the send is written, as build.ts would have set it
       const th = (text) => ' [thread ' + queued.find((c) => c.text === text)?.id + ']';
       $('[data-note-send]').click();
       await until(() => copied);
       await sleep(150);
-      r.sent = !!copied && copied.startsWith('# Review comments on #42 ') && copied.includes(': 5 comments')
+      delete window.GR_DATA.prs[0].mode;
+      r.sent = !!copied && copied.startsWith('# Review comments on #42 ') && copied.includes(' (read-only): 5 comments')
         && copied.includes('1. General' + th('Seeded general comment') + '\\n   Seeded general comment') && copied.includes('src/webhooks/backoff.ts (the file) [thread ')
         && copied.includes('src/webhooks/deliver.ts:27 [thread ') && copied.includes('src/webhooks/deliver.ts:31-33' + th('Dragged over three lines') + '\\n   | + ')
         && copied.includes('src/webhooks/deliver.ts:35-37 [thread ') && queued.every((c) => copied.includes(' [thread ' + c.id + ']\\n'));
