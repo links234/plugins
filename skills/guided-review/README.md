@@ -1,7 +1,7 @@
 # guided-review
 
-A skill for Claude that turns a pull request (or any branch) into a guided code review, published as a Claude
-Artifact.
+A skill for Claude that turns a pull request, a branch or your uncommitted changes into a guided code review,
+published as a Claude Artifact. The pull request can be yours or someone else's.
 
 A big diff shown in file order makes the reviewer work out what the change does. A guided review does that work for
 them:
@@ -36,10 +36,18 @@ them:
   republishes the guide for the new head. `c` hides the margin. Without a Claude session to send to, Send copies the
   comments for the chat. On a narrow screen the boxes sit in the code instead.
 - **Comment threads**: a sent comment stays as a thread, with Claude's answer. Reply in it to keep the conversation
-  going. Each thread has a Claude agent of its own, a background subagent that reads its code, answers and makes its
-  changes, so one thread's work stays out of the others'; the session that published the page keeps a ledger of every
-  thread, and settles once a problem or a design choice that several share. The bell in the bar lists the answers you have not read; click one to go to it. As on GitHub, a thread follows its code to a new head, is marked **Outdated** when that code is gone, and
-  folds away when resolved.
+  going. Files and lines named in a thread link to their code, as in the chapter text, whoever wrote them, and so does
+  each symbol Claude writes as a ref. Each thread has a Claude agent of its own, a background subagent that reads its
+  code, answers and makes its changes, so one thread's work stays out of the others'; the session that published the
+  page keeps a ledger of every thread, and settles once a problem or a design choice that several share. The bell in
+  the bar lists the answers you have not read; click one to go to it. As on GitHub, a thread follows its code to a new
+  head, is marked **Outdated** when that code is gone, and folds away when resolved.
+- **Uncommitted changes**: review the working tree without a commit. gather takes a snapshot of it, staged, unstaged
+  and untracked files, and leaves your files, index and refs as they are. Claude's changes land in the working tree, and
+  nothing is committed.
+- **Someone else's pull request**: gather clones the repository beside the guide, at the pull request's head, so it
+  needs no checkout and touches none. Claude answers comments and changes no code. When you ask, your comments become a
+  pending review on GitHub, which you submit there.
 - **Its spec**: a change built from a [thinkr](../thinkr) spec links to it. **Spec** in the bar opens the design page
   on the spec that produced the change, and the header names the design version it implements. Claude reads the spec
   too, and a chapter whose code departs from it says so.
@@ -69,6 +77,7 @@ project).
 
 - [Bun](https://bun.sh) 1.2 or newer and git on your `PATH`. The first build installs its packages (pele,
   markdown-it and sanitize-html) once, from the pinned lockfile.
+- [`gh`](https://cli.github.com), signed in, only for someone else's pull request.
 - Publishing uses Claude's Artifact tool, so guides are made in Claude Code or another Claude client that can publish
   Artifacts. Without it, Claude hands you the preview file, a full HTML document.
 - Optional: Google Chrome, for the screenshot check (`scripts/shot.ts`).
@@ -79,12 +88,15 @@ Ask in plain words:
 
 - "Write a guided review of PR 214."
 - "Walk me through what the `retry-webhooks` branch changes."
+- "Review my local diff. I have not committed it."
+- "Write a guided review of https://github.com/acme/api/pull/88. It is Sam's, and I am reviewing it."
 - "Review the stack #140 to #142 as one guide."
 
 Claude gathers the diff, reads the change, writes the chapters, checks and builds the page, publishes it, and gives
 you the link. Comment on lines, files or the whole pull request, and send each comment at once or queue them and send
 them from the bar: Claude answers each comment in its thread, makes the changes you asked for, and puts the next version of the guide
-on the same link. Reply in a thread to go on. Claude pushes only when you say so.
+on the same link. Reply in a thread to go on. Claude pushes only when you say so. On uncommitted changes it commits
+nothing, and on someone else's pull request it changes no code.
 
 ## Maintain
 
@@ -92,7 +104,7 @@ Run these in this folder, after `bun install`:
 
 | Command | Does |
 |---|---|
-| `bun run test` | gather and build against a scratch repository (kinds, scopes, moves, refs, escaping, every refusal), then the demo in headless Chrome over DevTools: behavior, no console errors, and timing budgets (boot ≤ 30 ms, each interaction ≤ 12 ms) |
+| `bun run test` | gather and build against a scratch repository (kinds, scopes, moves, refs, escaping, every refusal, a working tree's snapshot, a pull request from a stand-in for GitHub), then the demo in headless Chrome over DevTools: behavior, no console errors, and timing budgets (boot ≤ 30 ms, each interaction ≤ 12 ms) |
 | `bun run typecheck` | `tsc` over the runtime and the scripts |
 | `bun run example` | Builds the demo into `examples/demo.preview.html`, and the two stacked demo pull requests into `examples/stack.preview.html` |
 | `bun scripts/build.ts --refresh` | Moves @pierre/diffs and @pierre/trees to their newest release that is at least 14 days old (the artifact rule); `--major` crosses a major version |

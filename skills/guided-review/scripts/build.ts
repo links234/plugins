@@ -84,6 +84,9 @@ const CHEV = ICON.down;
 const MARK_LABEL: Record<string, string> = { new: 'New', changed: 'Changed', removed: 'Removed' };
 
 // ---------------------------------------------------------------- one pull request
+/** The commit a link to GitHub names. */
+const linkRevOf = (diff: Diff) => (diff.snapshotOf ? diff.base : diff.head);
+
 interface Built {
   id: string; prefix: string; number: number | null; title: string; url: string | null; name?: string; repo: string;
   base: string; branch: string | null; add: number; del: number; files: number;
@@ -105,12 +108,13 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
   // -------------------------------------------------------------- refs
   // "path:line" names a line on the new side, or on the old side for a removed line. A file the pull request does
   // not change links to GitHub at the head commit, and so does a line the page cannot show: one outside the hunks
-  // of a file kept without its text.
+  // of a file kept without its text. GitHub has no snapshot of a working tree, so its links go to the base instead.
   type Ref = { path: string; line: number; side?: 'o' | 'n'; external?: string };
   const repoUrl = String(pr.url ?? '').replace(/\/pull\/\d+.*$/, '') || diff.repo;
   const atHead = (path: string) => Bun.spawnSync(['git', '-C', checkout, 'cat-file', '-e', `${diff.head}:${path}`], { stdout: 'ignore', stderr: 'ignore' }).exitCode === 0;
   const inHunks = (f: DiffFile, line: number, s: 'o' | 'n') => f.hunks.some((h) => h.lines.some((l) => (s === 'o' ? l[1] : l[2]) === line));
   const blob = (rev: string, path: string, line: number) => `${repoUrl}/blob/${rev}/${path}${line ? `#L${line}` : ''}`;
+  const linkRev = linkRevOf(diff);
 
   function parseRef(ref: string, side: 'o' | 'n', where: string): Ref | null {
     const m = String(ref).match(/^(.+?)(?::(\d+))?$/);
@@ -119,7 +123,7 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     if (!m || !f) {
       if (m && atHead(m[1])) {
         if (!repoUrl) { err(`${where}: ref "${ref}" names a file the pull request does not change, and there is no repository URL to link it to (set pr.url).`); return null; }
-        return { path: m[1], line, external: blob(diff.head, m[1], line) };
+        return { path: m[1], line, external: blob(linkRev, m[1], line) };
       }
       err(`${where}: ref "${ref}" names a file that is neither in this pull request nor at its head in ${checkout} (pass --repo=<checkout>).`);
       return null;
@@ -130,7 +134,7 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     if (line && count != null && line > count) { err(`${where}: ref "${ref}" is past the end of the file (${count} lines).`); return null; }
     // The page shows a line outside the hunks only when it has the file's text.
     if (line && !f.new && !f.old && !inHunks(f, line, s)) {
-      if (!repoUrl) { err(`${where}: ref "${ref}" is outside the hunks of a file kept without its text, and there is no repository URL to link it to.`); return null; }
+      if (!repoUrl || diff.snapshotOf) { err(`${where}: ref "${ref}" is outside the hunks of a file kept without its text, and there is no ${repoUrl ? 'copy of this snapshot on GitHub' : 'repository URL'} to link it to.`); return null; }
       return { path: f.path, line, external: s === 'o' ? blob(diff.base, f.oldPath ?? f.path, line) : blob(diff.head, f.path, line) };
     }
     return { path: f.path, line, side: s };
@@ -148,6 +152,7 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
   if (pr.url && !/^https:\/\//.test(pr.url)) err('pr.url must start with https://.');
   if (guide.name != null && (!String(guide.name).trim() || words(guide.name) > 5)) err('name is the page\'s name in the gallery: 2 to 4 words, such as "Webhook retries review".');
   if (!multi && pr.number == null && guide.name == null) warn('Give a guide with no pull request number a name (2 to 4 words); the page is called "Review of <branch>" otherwise.');
+  if (pr.readOnly && diff.snapshotOf) err('pr.readOnly is for someone else\'s change; a snapshot of your working tree is yours.');
   if (guide.diffStyle != null && guide.diffStyle !== 'unified' && guide.diffStyle !== 'split') err('diffStyle must be "unified" or "split".');
   // the spec the change was built from: a thinkr design page, opened on its Spec view
   const spec = guide.spec;
@@ -371,7 +376,8 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     branch ? `<span class="mono">${esc(base)} ← ${esc(branch)}</span>` : '',
     `<span>${diff.files.length} file${diff.files.length === 1 ? '' : 's'}</span>`,
     `<span>${statHtml(total[0], total[1])}</span>`,
-    `<span>written for ${headLink}</span>`,
+    `<span>written for ${diff.snapshotOf ? `uncommitted changes on <span class="mono">${diff.snapshotOf.slice(0, 7)}</span>` : headLink}</span>`,
+    pr.readOnly ? '<span title="Claude answers comments on this page, and changes no code.">read-only</span>' : '',
     specUrl ? `<span>built from <a href="${esc(specUrl)}" target="_blank" rel="noopener">its spec${spec?.version ? `, design v${spec.version}` : ''}</a></span>` : '',
   ].filter(Boolean).join('');
   const ofWhat = pr.url ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">${num}</a>` : esc(branch ?? 'the branch');
@@ -393,7 +399,9 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
       + (links ? `<span class="gr-links">${links}</span>` : '')
       + (pr.url ? `<a class="k-btn is-sm is-primary" href="${esc(pr.url)}" target="_blank" rel="noopener"><span>Open ${num}<span class="long"> on GitHub</span></span><span aria-hidden="true">↗</span></a>` : ''),
     data: {
-      id, prefix: P, key: `gr:${pr.number ?? branch ?? diff.head}`, number: pr.number ?? null, title: pr.title, head: diff.head,
+      id, prefix: P, key: `gr:${pr.number ?? branch ?? diff.snapshotOf ?? diff.head}`, number: pr.number ?? null, title: pr.title, head: diff.head,
+      ...(pr.readOnly ? { mode: 'read-only' as const } : diff.snapshotOf ? { mode: 'uncommitted' as const } : {}),
+      ...(repoUrl ? { blob: `${repoUrl}/blob/${linkRev}/` } : {}),
       chapters: chapters.map((c, i) => ({ id: c.id, title: c.title, files: sel[i] ?? [] })), files: diff.files, diagrams: drawings,
     },
   };
@@ -404,7 +412,7 @@ const prs = inputs.map((x, i) => buildPr(x.guide, x.diff, i));
 // Markdown files are rendered here, with their change marked, so the page only shows them (scripts/markdown.ts).
 for (const [i, p] of prs.entries()) {
   const { diff } = inputs[i];
-  const md = await previews(diff.files, { repo: p.repo, base: diff.base, head: diff.head, checkout });
+  const md = await previews(diff.files, { repo: p.repo, base: diff.base, head: diff.head, checkout, link: linkRevOf(diff) });
   p.warns.push(...md.warns.map((w) => (multi ? `${p.number != null ? `#${p.number}` : p.id}: ` : '') + w));
   if (md.out.size) p.data.files = diff.files.map((f) => (md.out.has(f.path) ? { ...f, preview: md.out.get(f.path)! } : f));
   p.report[0] += `, ${md.out.size} Markdown preview${md.out.size === 1 ? '' : 's'}`;

@@ -69,6 +69,10 @@ export interface Diff {
   repo: string;
   base: string;
   head: string;
+  /** Set when `head` is a snapshot of the working tree: the commit it sits on. No remote holds the snapshot. */
+  snapshotOf?: string;
+  /** Paths left out of the snapshot. gather reads them back, so a rebuild keeps them out. */
+  exclude?: string[];
   baseRef: string;
   branch: string | null;
   commits: Commit[];
@@ -100,7 +104,11 @@ export interface Chapter {
 }
 export type DiffStyle = 'unified' | 'split';
 export interface Guide {
-  pr: { number?: number; title: string; url?: string; author?: string; base?: string; head?: string };
+  pr: {
+    number?: number; title: string; url?: string; author?: string; base?: string; head?: string;
+    /** Someone else's change: Claude answers comments on it, and changes no code. */
+    readOnly?: boolean;
+  };
   /** The page's name in the browser tab and the artifact gallery, 2 to 4 words. */
   name?: string;
   /** How code cards show a change at first: one column, or old and new side by side. Each reader can switch. */
@@ -135,6 +143,11 @@ export interface PagePr {
   title: string;
   /** The head commit the guide was written for: line comments name it, so their line numbers can be read back. */
   head: string;
+  /** What a send may do, named in its text; left out when Claude drives a branch. "uncommitted": it changes the working
+      tree and commits nothing. "read-only": it answers and changes no code. */
+  mode?: 'uncommitted' | 'read-only';
+  /** Where a file the pull request does not change is on GitHub: the start of its URL. Left out with no repository. */
+  blob?: string;
   chapters: PageChapter[];
   files: DiffFile[];
   /** Each section's diagram, drawn at build: by "overview" or "c-<chapter id>". */

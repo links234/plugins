@@ -7,8 +7,10 @@ a time, and spend attention only where it matters.
 ## Before you write
 
 Read the whole diff, not only the outline `gather.ts` prints: `git diff <base>...<head> -- <path>`, with the refs you
-gave `gather.ts`, a file or a folder at a time. Do not read `diff.json`; it holds the full old and new text of every
-changed file. Read the pull request's description, its commits and the thread that asked for it. Open the callers
+gave `gather.ts`, a file or a folder at a time. After `--worktree` or `--pr`, start from the command gather printed:
+plain `git diff` skips untracked files, and the checkout you started in may not hold the pull request. Do not read
+`diff.json`; it holds the full old and new text of every changed file. Read the pull request's description, its commits
+and the thread that asked for it. Open the callers
 and callees of each changed function until you can say what happened before the change and what happens now. On a
 large pull request (over about 1,000 changed lines), give that tracing to Explore subagents, one per area, and work
 from their short reports. When the diff and the description disagree, the diff wins: the guide describes the code at
@@ -21,7 +23,8 @@ not say, or leaves out something it does, say so as a plain fact in the chapter 
 change against the spec it was built from.
 
 If the read finds a defect in a pull request you drive, fix it first: the guide is written for the code that will
-merge. In someone else's pull request, tell the user; the guide still describes the code as it is.
+merge. In uncommitted changes or someone else's pull request, tell the user; the guide still describes the code as it
+is.
 
 ## Chapters
 

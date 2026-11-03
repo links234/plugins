@@ -136,12 +136,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .gr-body p { margin: 0 0 10px; }
 .gr-body ol { margin: 0 0 10px; padding-left: 20px; }
 .gr-body li { margin: 0 0 6px; padding-left: 2px; }
-.gr-body code, .gr-table code {
+:is(.gr-body, .gr-note-text) code, .gr-table code {
   font-size: .86em; background: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: .1em .35em; color: var(--fg);
 }
-.gr-body a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; transition: text-decoration-color .15s; }
-.gr-body a:hover { text-decoration-color: var(--fg); }
-.gr-body .ref { text-decoration-style: dotted; text-decoration-color: var(--muted-fg); }
+:is(.gr-body, .gr-note-text) a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; transition: text-decoration-color .15s; }
+:is(.gr-body, .gr-note-text) a:hover { text-decoration-color: var(--fg); }
+:is(.gr-body, .gr-note-text) .ref { text-decoration-style: dotted; text-decoration-color: var(--muted-fg); }
 
 .gr-filelist { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 2px; }
 .gr-filelist button {
@@ -216,7 +216,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .gr-dia .pele-node.is-ref { cursor: pointer; outline: none; }
 .gr-dia .pele-node.is-ref:is(:hover, :focus-visible) :is(rect, polygon, path, circle, ellipse) { stroke: var(--fg); }
 .gr-dia .pele-node.is-ref:is(:hover, :focus-visible) .pele-label { text-decoration: underline; }
-.gr-body a.ref[target]::after { content: " ↗"; }
+:is(.gr-body, .gr-note-text) a.ref[target]::after { content: " ↗"; }
 
 /* code: @pierre/diffs renders each card's code in its own shadow root. Its custom
    properties inherit from here; the folds and moved-code chips are ours, slotted in. */

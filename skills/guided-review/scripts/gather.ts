@@ -2,10 +2,20 @@
 /* Read a pull request's diff from git into diff.json, the data a guided review is built from.
 
      bun scripts/gather.ts --base=origin/main --head=HEAD --out=<work>/diff.json [--quiet]
+     bun scripts/gather.ts --base=HEAD --worktree [--exclude=<path>] --out=<work>/diff.json [--quiet]
+     bun scripts/gather.ts --pr=<number or url> [--checkout=<work>/checkout] --out=<work>/diff.json [--quiet]
 
    The diff is the one GitHub shows for the pull request: merge-base(base, head) to head. Writes diff.json (files,
    hunks, file text, scope lines, moves) and prints an outline of every file and hunk, numbered, which is what the
-   guide's chapters are written from. Run it anywhere inside the checkout. */
+   guide's chapters are written from. Run it anywhere inside the checkout.
+
+   --worktree makes the head a snapshot of the working tree, so nothing need be committed. --base=HEAD then reviews
+   only what is uncommitted, and --base=origin/main the branch with it. --exclude leaves a path out of the snapshot,
+   and it stays out each time gather writes the same diff.json again.
+   --pr reads a pull request from GitHub into a clone of its own, so it needs no checkout, and touches none. */
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import type { Diff, DiffFile, Hunk, Kind, Line, Status } from '../runtime/types';
 
 const argv = Bun.argv.slice(2);
@@ -15,11 +25,22 @@ const opt = (name: string, fallback: string) => {
   if (i < 0) return fallback;
   return argv[i].includes('=') ? argv[i].slice(name.length + 3) : (argv[i + 1] ?? fallback);
 };
+/** Every --name=value and --name value. */
+const opts = (name: string) => argv.flatMap((x, i) => (x === `--${name}` ? [argv[i + 1]] : x.startsWith(`--${name}=`) ? [x.slice(name.length + 3)] : []));
+const given = (name: string) => argv.some((x) => x === `--${name}` || x.startsWith(`--${name}=`));
 if (argv.includes('--help')) {
   console.log('usage: bun scripts/gather.ts [--base=origin/main] [--head=HEAD] [--out=diff.json] [--quiet]');
+  console.log('       bun scripts/gather.ts [--base=origin/main] --worktree [--exclude=<path>]... [--out=diff.json] [--quiet]');
+  console.log('       bun scripts/gather.ts --pr=<number or url> [--checkout=<dir>] [--out=diff.json] [--quiet]');
   process.exit(0);
 }
 const quiet = argv.includes('--quiet');
+const out = opt('out', 'diff.json');
+const worktree = given('worktree');
+if ((worktree && given('head')) || (given('pr') && (given('base') || given('head') || worktree))) {
+  console.log('error --worktree is the head, so it takes no --head; --pr names both ends, so it takes no --base, --head or --worktree.');
+  process.exit(1);
+}
 
 const MAX_TEXT_LINES = 4000; // larger files keep their hunks but no full text
 const MAX_TEXT_BYTES = 400_000;
@@ -28,20 +49,70 @@ const MOVE_MIN_CHARS = 60; // and this much text, so a few braces never count as
 
 // Paths from git are relative to the top of the checkout, so every call runs there, with paths taken literally,
 // wherever the script is run from.
-function git(args: string[], quietFail = false): string | null {
-  const p = Bun.spawnSync(['git', ...args], { stdout: 'pipe', stderr: 'pipe' });
+function git(args: string[], quietFail = false, env?: Record<string, string>): string | null {
+  const p = Bun.spawnSync(['git', ...args], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, ...env } });
   if (p.exitCode === 0) return p.stdout.toString();
   if (quietFail) return null;
   console.log(`error git ${args.join(' ')}: ${p.stderr.toString().trim()}`);
   process.exit(1);
 }
-const TOP = git(['rev-parse', '--show-toplevel'])!.trim();
-const run = (args: string[]) => git(['-C', TOP, '--literal-pathspecs', '-c', 'core.quotePath=false', ...args])!;
+
+/** A pull request gets a clone of its own, at its head: reading it leaves the reader's checkout alone, works for a
+    repository with no checkout here, and shows the code the guide describes. The clone is blobless, so only the files
+    read are downloaded, and signs in with gh's token, so it needs no SSH key. Run again, it moves to the new head. */
+function fetchPr(spec: string) {
+  if (!Bun.which('gh')) { console.log('error --pr needs gh: https://cli.github.com, then gh auth login.'); process.exit(1); }
+  const view = Bun.spawnSync(['gh', 'pr', 'view', spec, '--json', 'number,url,title,author,baseRefName,headRefName'], { stdout: 'pipe', stderr: 'pipe' });
+  if (view.exitCode !== 0) { console.log(`error gh pr view ${spec}: ${view.stderr.toString().trim()}`); process.exit(1); }
+  const pr: { number: number; url: string; title: string; author: { login: string }; baseRefName: string; headRefName: string } = JSON.parse(view.stdout.toString());
+  const repo = pr.url.replace(/\/pull\/\d+.*$/, '');
+  const dir = resolve(opt('checkout', join(dirname(out), 'checkout')));
+  if (existsSync(join(dir, '.git'))) {
+    const origin = git(['-C', dir, 'config', 'remote.origin.url'], true)?.trim();
+    if (origin !== `${repo}.git`) { console.log(`error ${dir} is a clone of ${origin}, not of ${repo}. Pass another --checkout.`); process.exit(1); }
+  } else {
+    git(['clone', '--quiet', '--filter=blob:none', '--no-checkout', '--no-tags', '--single-branch', '--branch', pr.baseRefName,
+      '--config', 'credential.helper=', '--config', 'credential.helper=!gh auth git-credential', `${repo}.git`, dir]);
+  }
+  const refs = `refs/guided-review/${pr.number}`;
+  git(['-C', dir, 'fetch', '--quiet', '--no-tags', 'origin', `+refs/pull/${pr.number}/head:${refs}/head`, `+refs/heads/${pr.baseRefName}:${refs}/base`]);
+  git(['-C', dir, 'checkout', '--quiet', '--detach', `${refs}/head`]);
+  return { pr, repo, dir, refs };
+}
+const pull = given('pr') ? fetchPr(opt('pr', '')) : null;
+
+const TOP = pull?.dir ?? git(['rev-parse', '--show-toplevel'])!.trim();
+const run = (args: string[], env?: Record<string, string>) => git(['-C', TOP, '--literal-pathspecs', '-c', 'core.quotePath=false', ...args], false, env)!;
 const tryRun = (args: string[]) => git(['-C', TOP, '--literal-pathspecs', '-c', 'core.quotePath=false', ...args], true);
 
-const headRef = opt('head', 'HEAD');
-const baseRef = opt('base', 'origin/main');
-const head = run(['rev-parse', '--verify', `${headRef}^{commit}`]).trim();
+// A path left out stays out when gather writes the same diff.json again: a rebuild that forgot the flag would put it
+// on the page.
+const exclude = [...new Set([...opts('exclude'), ...(worktree && existsSync(out) ? (JSON.parse(readFileSync(out, 'utf8')) as Diff).exclude ?? [] : [])])];
+
+/** The working tree as a commit on `on`: tracked changes, staged or not, and untracked files, but no ignored ones. It
+    is built in an index of its own and no ref holds it, so the reader's index, files and refs stay as they are. Its
+    names and dates are fixed, so the same files give the same commit, and comments stay on their head until the code
+    moves. Returns `on` itself when nothing differs. */
+function snapshot(on: string) {
+  const tmp = mkdtempSync(join(tmpdir(), 'guided-review-'));
+  const env = { GIT_INDEX_FILE: join(tmp, 'index') };
+  run(['read-tree', on], env);
+  run(['add', '-A'], env);
+  for (const path of exclude) run(['reset', '-q', on, '--', path], env);
+  const tree = run(['write-tree'], env).trim();
+  rmSync(tmp, { recursive: true, force: true });
+  if (tree === run(['rev-parse', `${on}^{tree}`]).trim()) return on;
+  const who = { NAME: 'guided-review', EMAIL: 'guided-review@localhost', DATE: '2000-01-01T00:00:00Z' };
+  return run(['commit-tree', '--no-gpg-sign', '-p', on, '-m', 'Uncommitted changes', tree], Object.fromEntries(
+    ['AUTHOR', 'COMMITTER'].flatMap((role) => Object.entries(who).map(([k, v]) => [`GIT_${role}_${k}`, v])),
+  )).trim();
+}
+
+const headRef = pull ? `${pull.refs}/head` : opt('head', 'HEAD');
+const baseRef = pull ? `${pull.refs}/base` : opt('base', 'origin/main');
+const tip = run(['rev-parse', '--verify', `${headRef}^{commit}`]).trim();
+const head = worktree ? snapshot(tip) : tip;
+const snapshotOf = head === tip ? null : tip;
 const baseTip = run(['rev-parse', '--verify', `${baseRef}^{commit}`]).trim();
 const base = run(['merge-base', baseTip, head]).trim();
 // The head's branch name, without the remote's prefix that a ref like origin/<branch> carries.
@@ -49,7 +120,7 @@ const remotes = (tryRun(['remote']) ?? '').split('\n').filter(Boolean);
 const abbrev = tryRun(['rev-parse', '--abbrev-ref', headRef])?.trim() ?? null;
 const branch = remotes.reduce<string | null>((name, r) => (name?.startsWith(`${r}/`) ? name.slice(r.length + 1) : name), abbrev);
 const remote = tryRun(['remote', 'get-url', 'origin'])?.trim() ?? '';
-const repoUrl = remote.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '').replace(/^https:\/\/[^@/]+@/, 'https://');
+const repoUrl = pull?.repo ?? remote.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '').replace(/^https:\/\/[^@/]+@/, 'https://');
 
 // ---------------------------------------------------------------- classify
 const LANGS: Record<string, string> = {
@@ -85,6 +156,10 @@ for (let i = 0; i < ns.length;) {
   const code = ns[i++];
   if (code[0] === 'R' || code[0] === 'C') entries.push({ code: code[0], oldPath: ns[i++], path: ns[i++] });
   else entries.push({ code: code[0], oldPath: ns[i], path: ns[i++] });
+}
+if (!entries.length) {
+  console.log(`error nothing to review: ${base.slice(0, 7)} and ${head.slice(0, 7)} hold the same files.`);
+  process.exit(1);
 }
 
 /** A file's lines at a commit, kept only when small enough, and its line count either way, so refs into a large
@@ -280,22 +355,34 @@ for (const r of removed) {
 }
 
 // ---------------------------------------------------------------- write
-const out = opt('out', 'diff.json');
-const commits = (tryRun(['log', '--format=%h%x09%an%x09%s', `${base}..${head}`]) ?? '').trim().split('\n').filter(Boolean)
+const commits = (tryRun(['log', '--format=%h%x09%an%x09%s', `${base}..${tip}`]) ?? '').trim().split('\n').filter(Boolean)
   .map((l) => { const [sha, author, subject] = l.split('\t'); return { sha, author, subject }; });
-const data: Diff = { version: 1, repo: repoUrl, base, head, baseRef, branch: branch && branch !== 'HEAD' ? branch : null, commits, files };
+const named = pull?.pr.headRefName ?? (branch && branch !== 'HEAD' ? branch : null);
+// With only uncommitted changes, the branch is what they sit on: its name would read "HEAD" otherwise.
+const alone = snapshotOf === base;
+const data: Diff = {
+  version: 1, repo: repoUrl, base, head, ...(snapshotOf ? { snapshotOf } : {}), ...(exclude.length ? { exclude } : {}),
+  baseRef: pull?.pr.baseRefName ?? (alone ? named ?? base.slice(0, 7) : baseRef), branch: alone ? 'uncommitted changes' : named, commits, files,
+};
 await Bun.write(out, JSON.stringify(data));
 
 if (!quiet) {
   const sum = files.reduce((s, f) => [s[0] + f.add, s[1] + f.del], [0, 0]);
   console.log(`${files.length} files  +${sum[0]} -${sum[1]}  ${base.slice(0, 7)}..${head.slice(0, 7)}  ${commits.length} commits → ${out}`);
+  if (snapshotOf) console.log(`snapshot of the working tree on ${snapshotOf.slice(0, 7)}. Nothing was committed.${exclude.length ? ` Left out: ${exclude.join(', ')}.` : ''}`);
+  if (pull) {
+    const { number, url, title, author, baseRefName, headRefName } = pull.pr;
+    console.log(`checkout ${TOP}\npr ${JSON.stringify({ number, url, title, author: author.login, base: baseRefName, head: headRefName })}`);
+  }
+  if (snapshotOf || pull) console.log(`read it with: git -C ${TOP} diff ${base.slice(0, 7)} ${head.slice(0, 7)}`);
+  const untracked = new Set(snapshotOf ? run(['ls-files', '--others', '--exclude-standard', '-z']).split('\0') : []);
   for (const kind of ['core', 'docs', 'database', 'tests', 'generated'] as Kind[]) {
     const group = files.filter((f) => f.kind === kind);
     if (!group.length) continue;
     console.log(`\n${kind}`);
     for (const f of group) {
       const from = f.oldPath ? ` (from ${f.oldPath})` : '';
-      console.log(`  ${f.path}${from}  ${f.status}  +${f.add} -${f.del}${f.binary ? '  binary' : ''}${f.new || f.old ? '' : '  (no full text)'}`);
+      console.log(`  ${f.path}${from}  ${f.status}  +${f.add} -${f.del}${f.binary ? '  binary' : ''}${f.new || f.old ? '' : '  (no full text)'}${untracked.has(f.path) ? '  untracked' : ''}`);
       if (kind === 'generated') continue;
       for (const h of f.hunks) {
         const a = h.lines.filter((l) => l[0] === '+').length, d = h.lines.filter((l) => l[0] === '-').length;
