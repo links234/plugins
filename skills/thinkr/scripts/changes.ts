@@ -1,4 +1,4 @@
-/* What changed between versions of a plan, found at build. build.ts keeps each version's blocks in
+/* What changed between versions of a design, found at build. build.ts keeps each version's blocks in
    <page>.history.json beside the page. On each build, track() lines the page's blocks up against the last version
    before this one and writes the marks into the page:
 

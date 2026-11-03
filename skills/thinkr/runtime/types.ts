@@ -6,10 +6,10 @@ export type { SoundName };
 
 /** A library: a single-file build that sets `global` (after its `deps`), or an ES module with its import graph. */
 export type Libs = Record<string, { url: string; global?: string; deps?: string[]; modules?: string[] }>;
-/** `use`: the libraries this page needs, which build.ts found in its scripts. */
-export interface Config { libs: Libs; use: string[] }
+/** `use`: the libraries this page needs, which build.ts found in its scripts. `spec`: a design's spec as written. */
+export interface Config { libs: Libs; use: string[]; spec?: string }
 
-export type Mode = 'plan' | 'explain';
+export type Mode = 'design' | 'explain';
 export type RGBA = [number, number, number, number];
 export type Controls = Record<string, number | string | boolean>;
 export type Size = { width: number; height: number };

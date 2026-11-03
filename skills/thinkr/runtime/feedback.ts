@@ -1,4 +1,4 @@
-/* The plan dock: progress (click it to jump to the next open question), Send feedback and Approve plan. Either
+/* The design dock: progress (click it to jump to the next open question), Send feedback and Approve design. Either
    button opens a panel above the dock with an optional message and Submit. Each viewer's answers and message go to
    the page database at responses/<user id> (Claude reads them with ArtifactData); Submit posts a short summary
    with Send to Claude, which wakes the session. Where a viewer cannot send, the summary is copied for the chat. */
@@ -28,11 +28,11 @@ export function createDock({ page, version, key, questions, onChange, jump }: Do
   // ---------------------------------------------------------------- dock
   const fill = h('i');
   const count = h('b');
-  const progress = h('button', { class: 't-progress', type: 'button', title: 'Go to the next open question' },
+  const progress = h('button', { class: 't-progress', type: 'button', title: 'Go to the next open question', hidden: !asks.length },
     h('span', { class: 't-meter' }, fill), h('span', {}, count, h('span', { class: 't-plabel' }, ' answered')));
   progress.addEventListener('click', () => { const q = open()[0]; if (q) jump(q.el); });
   const sendBtn = h('button', { class: 'k-btn is-sm', type: 'button', 'aria-expanded': 'false', 'aria-controls': 't-composer' }, 'Send feedback');
-  const approveBtn = h('button', { class: 'k-btn is-sm is-primary', type: 'button', 'aria-expanded': 'false', 'aria-controls': 't-composer' }, 'Approve plan');
+  const approveBtn = h('button', { class: 'k-btn is-sm is-primary', type: 'button', 'aria-expanded': 'false', 'aria-controls': 't-composer' }, 'Approve design');
 
   // ---------------------------------------------------------------- panel
   const heading = h('b');
@@ -65,7 +65,7 @@ export function createDock({ page, version, key, questions, onChange, jump }: Do
     if (approving === approve) return hide();
     const wasOpen = approving !== null;
     approving = approve;
-    heading.textContent = approve ? 'Approve plan' : 'Send feedback';
+    heading.textContent = approve ? 'Approve design' : 'Send feedback';
     const n = open().length;
     warn.hidden = !approve || n === 0;
     warnText.textContent = n === 1 ? '1 question is still open.' : `${n} questions are still open.`;
@@ -127,7 +127,7 @@ export function createDock({ page, version, key, questions, onChange, jump }: Do
 
   // ---------------------------------------------------------------- send
   // An answer an earlier send delivered, unchanged since, is named instead of repeated, so Send feedback and then
-  // Approve plan do not send every answer twice. Only with the page database, which still holds it for Claude.
+  // Approve design do not send every answer twice. Only with the page database, which still holds it for Claude.
   const sentKey = key + ':sent';
   const summary = (approved: boolean, reports: AnswerReport[], answers: Record<string, string>) => {
     const before = (docRef && store.get<Record<string, string>>(sentKey)) || {};

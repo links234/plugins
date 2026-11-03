@@ -40,6 +40,9 @@ them:
   changes, so one thread's work stays out of the others'; the session that published the page keeps a ledger of every
   thread, and settles once a problem or a design choice that several share. The bell in the bar lists the answers you have not read; click one to go to it. As on GitHub, a thread follows its code to a new head, is marked **Outdated** when that code is gone, and
   folds away when resolved.
+- **Its spec**: a change built from a [thinkr](../thinkr) spec links to it. **Spec** in the bar opens the design page
+  on the spec that produced the change, and the header names the design version it implements. Claude reads the spec
+  too, and a chapter whose code departs from it says so.
 - **Stacks**: one page can hold several pull requests, a stack or any set to review together. The title becomes a
   menu of them, a stack drawn from its base up, each with its branches, size and review progress; `[` and `]` move
   between them.

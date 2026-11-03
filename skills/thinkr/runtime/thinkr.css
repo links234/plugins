@@ -1,5 +1,5 @@
 /* thinkr: one reading column with an "On this page" rail, in the kit's look (kit/tokens.css, kit/ui.css under it). */
-:root { --k-toast-bottom: 76px; } /* above the plan dock */
+:root { --k-toast-bottom: 76px; } /* above the design dock */
 
 .c1 { color: var(--c1); } .c2 { color: var(--c2); } .c3 { color: var(--c3); } .c4 { color: var(--c4); } .c5 { color: var(--c5); }
 
@@ -10,8 +10,8 @@
 .t-bar-end { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .t-layout { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: center; gap: 56px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 160px; }
-t-page { display: block; min-width: 0; max-width: 720px; width: 100%; margin-inline: auto; }
-@media (min-width: 1180px) { .t-layout { grid-template-columns: minmax(0, 720px) 220px; } t-page { margin: 0; } }
+:is(t-page, t-spec) { display: block; min-width: 0; max-width: 720px; width: 100%; margin-inline: auto; }
+@media (min-width: 1180px) { .t-layout { grid-template-columns: minmax(0, 720px) 220px; } :is(t-page, t-spec) { margin: 0; } }
 
 /* ---------- toc: sections, with their questions one notch to the right */
 .t-toc { display: none; }
@@ -35,7 +35,7 @@ t-page { display: block; min-width: 0; max-width: 720px; width: 100%; margin-inl
   .t-toc-thumb { transition: clip-path .2s cubic-bezier(.2, .8, .2, 1); }
 }
 
-/* ---------- changes (plans): versions that fold, each change one row that opens to say why, in the look of "On this
+/* ---------- changes (designs): versions that fold, each change one row that opens to say why, in the look of "On this
    page". A column left of the page on wide screens, a panel from the bar's Changes button below. */
 t-amends { display: none; }
 .t-changes { font-size: 13px; }
@@ -100,21 +100,21 @@ t-amends { display: none; }
 t-page header { margin-bottom: 48px; }
 .t-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 12.5px; color: var(--muted-fg); }
 h1, h2, h3, h4 { text-wrap: balance; color: var(--fg); }
-t-page h1 { margin: 0; font-size: clamp(30px, 5vw, 40px); line-height: 1.12; font-weight: 600; letter-spacing: -0.035em; }
+:is(t-page, t-spec) h1 { margin: 0; font-size: clamp(30px, 5vw, 40px); line-height: 1.12; font-weight: 600; letter-spacing: -0.035em; }
 .lede { margin: 16px 0 0; font-size: 17px; line-height: 1.6; color: var(--muted-fg); text-wrap: pretty; }
-t-page h2 { margin: 72px 0 12px; font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -0.025em; scroll-margin-top: 84px; }
-t-page h3 { margin: 40px 0 8px; font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -0.015em; scroll-margin-top: 84px; }
-t-page h4 { margin: 28px 0 4px; font-size: 15px; font-weight: 600; }
-t-page section:first-of-type > h2:first-child { margin-top: 0; }
-t-page p, t-page li { text-wrap: pretty; }
-t-page p { margin: 0 0 16px; }
-t-page ul, t-page ol { margin: 0 0 16px; padding-left: 20px; }
-t-page li { margin: 4px 0; }
-t-page li::marker { color: var(--muted-fg); }
-t-page a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; transition: text-decoration-color .15s; }
-t-page a:hover { text-decoration-color: var(--fg); }
-t-page a.t-ext::after, .t-chg-body a.t-ext::after { content: "↗"; display: inline-block; margin-left: 2px; font-size: 0.8em; color: var(--muted-fg); text-decoration: none; transition: transform .15s; }
-t-page a.t-ext:hover::after { transform: translate(1px, -1px); color: var(--fg); }
+:is(t-page, t-spec) h2 { margin: 72px 0 12px; font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -0.025em; scroll-margin-top: 84px; }
+:is(t-page, t-spec) h3 { margin: 40px 0 8px; font-size: 17px; line-height: 1.4; font-weight: 600; letter-spacing: -0.015em; scroll-margin-top: 84px; }
+:is(t-page, t-spec) h4 { margin: 28px 0 4px; font-size: 15px; font-weight: 600; }
+:is(t-page, t-spec) section:first-of-type > h2:first-child { margin-top: 0; }
+:is(t-page, t-spec) p, :is(t-page, t-spec) li { text-wrap: pretty; }
+:is(t-page, t-spec) p { margin: 0 0 16px; }
+:is(t-page, t-spec) ul, :is(t-page, t-spec) ol { margin: 0 0 16px; padding-left: 20px; }
+:is(t-page, t-spec) li { margin: 4px 0; }
+:is(t-page, t-spec) li::marker { color: var(--muted-fg); }
+:is(t-page, t-spec) a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; transition: text-decoration-color .15s; }
+:is(t-page, t-spec) a:hover { text-decoration-color: var(--fg); }
+:is(t-page, t-spec) a.t-ext::after, .t-chg-body a.t-ext::after { content: "↗"; display: inline-block; margin-left: 2px; font-size: 0.8em; color: var(--muted-fg); text-decoration: none; transition: transform .15s; }
+:is(t-page, t-spec) a.t-ext:hover::after { transform: translate(1px, -1px); color: var(--fg); }
 t-refs { display: block; margin: 24px 0; }
 t-refs ul, t-refs ol { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 t-refs li { margin: 0; border-bottom: 1px solid var(--border); }
@@ -124,9 +124,9 @@ t-refs a:hover { background: var(--muted); }
 t-refs a.t-ext::after { margin-left: 0; order: 3; }
 t-refs .t-host { order: 2; margin-left: auto; font: 400 12px var(--mono); color: var(--muted-fg); white-space: nowrap; }
 t-refs li > small { display: block; padding: 0 14px 10px; margin-top: -6px; color: var(--muted-fg); font-size: 13px; }
-t-page strong { font-weight: 600; }
-t-page hr { border: 0; border-top: 1px solid var(--border); margin: 48px 0; }
-t-page code { font-family: var(--mono); font-size: 0.86em; background: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0.1em 0.35em; }
+:is(t-page, t-spec) strong { font-weight: 600; }
+:is(t-page, t-spec) hr { border: 0; border-top: 1px solid var(--border); margin: 48px 0; }
+:is(t-page, t-spec) code { font-family: var(--mono); font-size: 0.86em; background: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0.1em 0.35em; }
 blockquote { margin: 0 0 16px; padding-left: 16px; border-left: 2px solid var(--border); color: var(--muted-fg); }
 
 /* ---------- callout */
@@ -140,11 +140,11 @@ t-callout b.t-callout-label { display: block; font-weight: 600; margin-bottom: 2
 
 /* ---------- tables and code */
 .t-scroll { overflow-x: auto; margin: 24px 0; border: 1px solid var(--border); border-radius: var(--radius); }
-t-page table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-t-page th { text-align: left; font-weight: 500; color: var(--muted-fg); background: var(--muted); }
-t-page th, t-page td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
-t-page tr:last-child td { border-bottom: 0; }
-t-page td.num, t-page th.num { text-align: right; font-family: var(--mono); font-size: 13px; }
+:is(t-page, t-spec) table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+:is(t-page, t-spec) th { text-align: left; font-weight: 500; color: var(--muted-fg); background: var(--muted); }
+:is(t-page, t-spec) th, :is(t-page, t-spec) td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+:is(t-page, t-spec) tr:last-child td { border-bottom: 0; }
+:is(t-page, t-spec) td.num, :is(t-page, t-spec) th.num { text-align: right; font-family: var(--mono); font-size: 13px; }
 .t-code { position: relative; margin: 24px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); overflow: hidden; }
 .t-code-head { display: flex; align-items: center; height: 38px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--border); font: 12.5px var(--mono); color: var(--muted-fg); }
 .t-code-head .k-btn { margin-left: auto; }
@@ -207,7 +207,7 @@ t-figure.is-resizing { user-select: none; }
 t-figure figcaption { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted-fg); }
 
 /* a Mermaid diagram, drawn at build in the kit's colors (kit/ui.css), boxed like a figure */
-t-page .k-dia { margin: 32px 0; padding: 20px 16px; border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); background: var(--card); }
+:is(t-page, t-spec) .k-dia { margin: 32px 0; padding: 20px 16px; border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); background: var(--card); }
 t-figure figcaption b { color: var(--fg); font-weight: 500; }
 .t-stepper { display: flex; align-items: center; gap: 10px; flex: 1 1 260px; min-width: 0; }
 .t-steptext { flex: 1; min-width: 0; color: var(--fg); }
@@ -268,7 +268,7 @@ textarea.t-field { min-height: 76px; field-sizing: content; }
 t-explain { display: block; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--muted); font-size: 14px; }
 t-explain > :last-child { margin-bottom: 0; }
 
-/* ---------- plan dock */
+/* ---------- design dock */
 .t-dock { position: fixed; z-index: 25; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
   padding: 8px 8px 8px 16px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in oklch, var(--card) 88%, transparent);
@@ -283,7 +283,7 @@ t-explain > :last-child { margin-bottom: 0; }
 .t-meter i { display: block; height: 100%; width: 0; background: var(--fg); border-radius: inherit; transition: width .22s cubic-bezier(.2, .8, .2, 1); }
 @media (max-width: 520px) { .t-meter, .t-progress .t-plabel, .t-composer-hint { display: none; } .t-dock { gap: 8px; padding-left: 12px; } }
 
-/* the panel Send feedback and Approve plan open, right above the dock */
+/* the panel Send feedback and Approve design open, right above the dock */
 .t-composer { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); width: min(440px, calc(100vw - 32px));
   display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
   background: var(--card); box-shadow: var(--shadow); text-align: left; transform-origin: 50% 100%;
@@ -319,6 +319,20 @@ t-page t-figure.is-lit, t-page t-question.is-lit, t-page .k-dia.is-lit { backgro
 @keyframes t-flash { from { outline-color: color-mix(in oklch, var(--fg) 40%, transparent); } to { outline-color: transparent; } }
 .t-flash { outline: 2px solid transparent; outline-offset: 6px; animation: t-flash 1.4s cubic-bezier(.4, 0, .2, 1); }
 t-question.t-flash { outline-offset: 4px; }
-t-page h2 { border-radius: 6px; }
+:is(t-page, t-spec) h2 { border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .t-flash { animation: none !important; outline-color: color-mix(in oklch, var(--fg) 40%, transparent); } }
 
+
+/* ---------- spec: a design's spec in its own view, behind the Design | Spec switch (runtime/spec.ts). It reads as a
+   reference: the summary under the title as the lede, tighter sections than the design's. The dock and Changes
+   belong to the design, so they step aside. */
+t-spec h1 { margin-bottom: 16px; }
+t-spec h1 + p { margin: 0 0 40px; font-size: 17px; line-height: 1.6; color: var(--muted-fg); }
+t-spec h2 { margin-top: 56px; }
+t-spec h1 + p + h2, t-spec h1 + h2 { margin-top: 0; }
+t-spec .t-spec-copy { margin-left: auto; }
+t-spec .t-spec-copy .t-spec-icon { display: inline-flex; }
+t-spec .t-spec-copy svg { width: 14px; height: 14px; }
+.t-in-spec .t-dock, .t-in-spec .t-chgnav, .t-in-spec .t-changes-btn { display: none !important; }
+.t-in-spec .t-bar.is-stepping .t-bar-title { display: flex; }
+@media (max-width: 520px) { t-spec .t-spec-copy { padding: 0 8px; } }

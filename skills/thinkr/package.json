@@ -8,10 +8,11 @@
     "shot": "bun scripts/shot.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun scripts/test.ts",
-    "examples": "bun scripts/build.ts templates/plan.html && bun scripts/build.ts templates/explain.html"
+    "examples": "bun scripts/build.ts templates/design.html && bun scripts/build.ts templates/explain.html"
   },
   "dependencies": {
     "highlight.js": "11.12.0",
+    "markdown-it": "15.0.2",
     "mathjax-full": "3.2.2",
     "pele": "1.5.2"
   },

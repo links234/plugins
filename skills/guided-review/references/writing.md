@@ -14,6 +14,12 @@ large pull request (over about 1,000 changed lines), give that tracing to Explor
 from their short reports. When the diff and the description disagree, the diff wins: the guide describes the code at
 its head commit.
 
+When the change was built from a spec (the description has a `Spec:` line with a thinkr design page's link), read the
+spec too: `Artifact` `read` of that link, without its `#spec`, with `path: "spec.md"`. Set `spec` in the guide
+([guide-format.md](guide-format.md#top-level)), so the page links to it. Where the code does something the spec does
+not say, or leaves out something it does, say so as a plain fact in the chapter that holds it: the reader reviews the
+change against the spec it was built from.
+
 If the read finds a defect in a pull request you drive, fix it first: the guide is written for the code that will
 merge. In someone else's pull request, tell the user; the guide still describes the code as it is.
 

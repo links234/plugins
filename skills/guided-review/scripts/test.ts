@@ -208,6 +208,11 @@ check('a guide can start in split', splitGuide.status === 0 && splitGuide.data.i
 check('a branch with no pull request builds', branchOnly.status === 0 && !branchOnly.html.includes('Open #') && branchOnly.html.startsWith('<title>Review of pr</title>'), branchOnly.log);
 const named = build({ ...guideFor('One.'), name: 'Scratch values review' });
 check('a guide names its page', named.html.startsWith('<title>Scratch values review</title>'), named.log);
+// the spec the change was built from: its design page, opened on the Spec view, in the bar and the header
+const specced = build({ ...guideFor('One.'), spec: { url: 'https://claude.ai/code/artifact/0a1b', version: 3 } });
+check('a guide links the spec it was built from', specced.status === 0
+  && specced.html.includes('<a class="k-btn is-sm" href="https://claude.ai/code/artifact/0a1b#spec" target="_blank" rel="noopener" title="The spec this change was built from">Spec')
+  && specced.html.includes('built from <a href="https://claude.ai/code/artifact/0a1b#spec" target="_blank" rel="noopener">its spec, design v3</a>'), specced.log);
 
 const refusals: [string, unknown, RegExp][] = [
   ['a hunk in no chapter', guideFor('One.', [
@@ -223,6 +228,7 @@ const refusals: [string, unknown, RegExp][] = [
   ]), /\(one\): a core chapter comes after a database, tests or generated chapter/],
   ['a link that is not https', guideFor('See [it](javascript:alert(1)).'), /must start with https:\/\/ or ref:/],
   ['a links entry that is not https', { ...guideFor('One.'), links: [{ label: 'It', href: 'javascript:alert(1)' }] }, /links\[0\]: href must start with https:\/\//],
+  ['a spec link that is not https', { ...guideFor('One.'), spec: { url: 'javascript:alert(1)' } }, /spec\.url is the design page's link/],
   ['a pull request number without its url', { ...guideFor('One.'), pr: { number: 1, title: 'T' } }, /pr needs both number and url/],
   ['a name that is a sentence', { ...guideFor('One.'), name: 'A guided review of the scratch values change' }, /name is the page's name in the gallery/],
   ['a diff style that is neither unified nor split', { ...guideFor('One.'), diffStyle: 'side-by-side' }, /diffStyle must be "unified" or "split"/],

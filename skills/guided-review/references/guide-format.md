@@ -12,6 +12,7 @@ the diff. [`../examples/demo.guide.json`](../examples/demo.guide.json) uses ever
 | `name` | no | The page's name in the browser tab and the artifact gallery, 2 to 4 words, such as "Webhook retries review". Defaults to "Guided review #<number>", or "Review of <branch>" with no pull request. |
 | `diffStyle` | no | `"unified"` (default) to show each change in one column, or `"split"` to show old and new side by side. It is where cards start: each reader can switch with the Unified / Split control in the bar, and the page remembers their choice. Screens under 860 px wide always show one column. Pick `split` when most changes rewrite lines in place rather than add or remove whole blocks. |
 | `links` | no | Buttons in the top bar, `[{ "label": "Video", "href": "https://…" }]`. Link the pull request's video and anything else the reader checks the change with. `https://` only. |
+| `spec` | no | The spec the change was built from, when a thinkr design produced it: `{ "url": "https://claude.ai/code/artifact/…#spec", "version": 3 }`. `url` is the design page's link from the description's `Spec:` line (the build adds `#spec`, which opens the page on its spec, when the link has no `#`); `version` is the design version the spec implements, its `design-version`. The bar gets a **Spec** button, and the header says "built from its spec, design v3". `https://` only. |
 | `overview` | yes | The opening section. See below. |
 | `chapters` | yes | The chapters, in reading order. See below. |
 

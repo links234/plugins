@@ -56,11 +56,13 @@ request: rebuilding from the same `guide.json` and publishing the same file keep
    between commits, not the working tree. The outline lists each file by kind (core, docs, database, tests,
    generated) with its hunks, numbered, and the function or section each hunk sits in.
 2. **Read the change** as [writing.md](references/writing.md#before-you-write) says: the diff itself with `git diff`,
-   never `diff.json`; the description, commits and thread; and the callers of each changed function.
+   never `diff.json`; the description, commits and thread; the callers of each changed function; and, when the
+   description has a `Spec:` line, the spec the change was built from.
 3. **Write `<work>/guide.json`.** Plan the chapters first, then each chapter's diagram, then the overview and its
    diagram:
    [writing.md](references/writing.md) has the rules and [guide-format.md](references/guide-format.md) the fields.
-   Put the pull request's video, if it has one, in `links`. Leave `diffStyle` out (unified) unless the user asks
+   Put the pull request's video, if it has one, in `links`, and the spec's link, if it has one, in `spec`, so the
+   page points to the spec that produced the change. Leave `diffStyle` out (unified) unless the user asks
    for split, or most changes rewrite lines in place.
 4. **Build and check.** Run it in the checkout, or pass the checkout with `--repo`: refs to files the pull request
    does not change are checked there.
@@ -118,7 +120,8 @@ its thread on the page (one `ArtifactData` document each), and reply in the comm
 ## Rules
 
 - **The guide describes the head commit.** Every claim must be visible in the diff or in the code it refs. When the
-  description, a plan or a thread says something the code does not do, follow the code, and say so to the user.
+  description, the spec, a plan or a thread says something the code does not do, follow the code, and say so to the
+  user. Where the code departs from its spec, the chapter that holds it says so, as a plain fact.
 - **Explain; do not grade.** Findings belong on the pull request. A risk the reader should know is a plain fact in
   the chapter that holds it.
 - **Every file and hunk appears once.** `build.ts` refuses a guide that leaves one out. Split a file by hunks when

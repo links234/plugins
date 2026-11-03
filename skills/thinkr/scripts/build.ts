@@ -14,15 +14,19 @@
    library in the page), and every library the page uses is preloaded from the head, its whole import graph at once,
    so nothing waits on a request chain. Needs `bun install` in this skill's directory.
 
+   A design's spec, <page>.spec.md beside the page, is checked and rendered into the page's Spec view, and published
+   beside it as spec.md (scripts/spec.ts).
+
    The font link, the shared stylesheet, the sounds, the library pinning and the diagrams come from the kit
    (kit/build/). */
-import { join } from 'node:path';
-import { FONTS, THEME, assets, preview, publishLines, runtime, styles } from '../kit/build/page';
+import { join, resolve } from 'node:path';
+import { FONTS, THEME, assets, json, preview, publishLines, runtime, styles } from '../kit/build/page';
 import { type LibMap, libs, preloads } from '../kit/build/libs';
 import { need as needIn } from '../kit/build/deps';
 import { diagrams } from '../kit/build/diagram';
 import { type Node, parse } from './tree';
 import { type History, KINDS, track } from './changes';
+import { type Spec, readSpec } from './spec';
 
 const RT = join(import.meta.dir, '..', 'runtime');
 const HOSTS = ['https://cdnjs.cloudflare.com/', 'https://cdn.jsdelivr.net/npm/', 'https://unpkg.com/'];
@@ -78,22 +82,23 @@ async function highlight(html: string) {
 
 /** Each <pre class="mermaid"> drawn into SVG with pele (kit/build/diagram.ts), in the page's colors. The artifact
     viewer draws a mermaid block itself, so none stays in the page. The block's other attributes (an id, its change
-    marks) move to the drawing's box. A diagram pele cannot read is an error, with its line in the page. */
-async function drawDiagrams(html: string, errors: string[]) {
+    marks) move to the drawing's box. A diagram pele cannot read is an error, with its line in the page, or its
+    number in the spec (`where`). */
+async function drawDiagrams(html: string, errors: string[], where = '') {
   const re = /<pre\b([^>]*\bclass="[^"]*\bmermaid\b[^"]*"[^>]*)>([\s\S]*?)<\/pre>/g;
   if (!re.test(html)) return html;
   const draw = await diagrams(join(import.meta.dir, '..'));
   let n = 0;
   return html.replace(re, (block, attrs: string, source: string, at: number) => {
-    const d = draw(decode(source).trim(), `t-dia-${++n}`);
-    if ('error' in d) { errors.push(`line ${html.slice(0, at).split('\n').length}: <pre class="mermaid">: ${d.error}`); return block; }
+    const d = draw(decode(source).trim(), `t-dia-${where ? where + '-' : ''}${++n}`);
+    if ('error' in d) { errors.push(`${where ? `${where}: diagram ${n}` : `line ${html.slice(0, at).split('\n').length}: <pre class="mermaid">`}: ${d.error}`); return block; }
     const box = attrs.replace(/\bclass="([^"]*)"/, (_, c: string) => `class="${['k-dia', ...c.split(/\s+/).filter((x) => x && x !== 'mermaid')].join(' ')}"`);
     return `<div${box}>${d.body}</div>`;
   });
 }
 
 // ---------------------------------------------------------------- checks
-function check(src: string, nodes: Node[]) {
+function check(src: string, nodes: Node[], spec: boolean) {
   const errors: string[] = [], warns: string[] = [];
   const by = (tag: string) => nodes.filter((n) => n.tag === tag);
 
@@ -106,9 +111,11 @@ function check(src: string, nodes: Node[]) {
 
   const pages = by('t-page');
   if (pages.length !== 1) { errors.push(`Need exactly one <t-page>, found ${pages.length}.`); return { errors, warns, mode: null, version: 0 }; }
-  const mode = pages[0].attrs.mode;
-  if (mode !== 'plan' && mode !== 'explain') errors.push('<t-page mode="plan|explain"> is required.');
+  // mode="plan" is the old name of design, and still builds
+  const mode = pages[0].attrs.mode === 'plan' ? 'design' : pages[0].attrs.mode;
+  if (mode !== 'design' && mode !== 'explain') errors.push('<t-page mode="design|explain"> is required.');
   if (!/^\d+$/.test(pages[0].attrs.version ?? '')) errors.push('<t-page version="N"> is required. Start at 1; add 1 on each republish.');
+  const version = +(pages[0].attrs.version ?? 1);
   if (!by('h1').length) errors.push('Add a <header> with an <h1> and a <p class="lede">.');
 
   const ids = new Map<string, number>();
@@ -142,18 +149,22 @@ function check(src: string, nodes: Node[]) {
     const mx = a.max;
     if (mx && (typ !== 'multi' || !/^\d+$/.test(mx) || +mx < 1 || +mx >= vals.length))
       errors.push(`line ${line}: max="${mx}" works only on type="multi", between 1 and the option count minus 1.`);
-    if (mode === 'plan' && !ans.length && typ !== 'text') {
+    if (mode === 'design' && !ans.length && typ !== 'text') {
       if (!rec) warns.push(`line ${line}: mark your pick in "${qid}" with recommended="value".`);
       if (opts.some((o) => !o.kids.some((c) => c.tag === 'small'))) warns.push(`line ${line}: give each option of "${qid}" a <small> line with its consequence.`);
     }
   }
 
-  if (mode === 'plan') {
-    if (!qs.some((q) => !('answer' in q.attrs))) errors.push('A plan needs at least one <t-question> for the reader to answer.');
+  if (mode === 'design') {
+    // decided questions leave the page, so a later version may have none; a spec needs every one decided
+    const open = qs.filter((q) => !('answer' in q.attrs));
+    if (spec && open.length) errors.push(`A spec is written once every question is decided, and ${open.length === 1 ? '1 is' : `${open.length} are`} still open (${open.map((q) => q.attrs.id).join(', ')}). Decide ${open.length === 1 ? 'it' : 'them'} first, or move the spec aside.`);
+    else if (!spec && !open.length && version === 1) errors.push('A design needs at least one <t-question> for the reader to answer.');
     if (qs.length > 7) warns.push(`${qs.length} questions. Ask only about forks that change what you build (2 to 5).`);
   } else if (mode === 'explain') {
     if (!by('t-figure').length) errors.push('An explainer is built on figures. Add at least one <t-figure>.');
-    if (qs.some((q) => !('answer' in q.attrs))) warns.push('Explainer questions without answer="..." go nowhere. Use answer= for self-checks, or make it a plan.');
+    if (qs.some((q) => !('answer' in q.attrs))) warns.push('Explainer questions without answer="..." go nowhere. Use answer= for self-checks, or make it a design.');
+    if (spec) errors.push('A spec belongs to a design. Move the spec aside, or make the page mode="design".');
   }
 
   for (const f of by('t-figure')) {
@@ -161,11 +172,10 @@ function check(src: string, nodes: Node[]) {
     if (!f.kids.some((k) => k.tag === 'figcaption')) errors.push(`line ${f.line}: <t-figure> needs a <figcaption> that says what to notice.`);
   }
   for (const n of by('t-notes'))
-    errors.push(`line ${n.line}: remove <t-notes>. The message box in the Send feedback / Approve plan panel replaces it.`);
+    errors.push(`line ${n.line}: remove <t-notes>. The message box in the Send feedback / Approve design panel replaces it.`);
 
   // changes: one <t-amends> list of what each version changed and why
-  const version = +(pages[0].attrs.version ?? 1);
-  if (mode === 'explain' && by('t-amend').length) errors.push('Remove <t-amends>: the Changes list is for plans.');
+  if (mode === 'explain' && by('t-amend').length) errors.push('Remove <t-amends>: the Changes list is for designs.');
   for (const a of by('t-amend')) {
     const v = a.attrs.version, kind = a.attrs.kind;
     if (a.parents.at(-1) !== 't-amends') errors.push(`line ${a.line}: put <t-amend> inside the page's one <t-amends>.`);
@@ -219,7 +229,7 @@ function transpile(scripts: string) {
   });
 }
 
-async function pack(src: string, stem: string, libmap: LibMap) {
+async function pack(src: string, stem: string, libmap: LibMap, spec: Spec | null) {
   const title = /<title>[\s\S]*?<\/title>/.exec(src)![0];
   const body = src.replace(title, '').trim();
   const at = body.search(/<script\b/);
@@ -228,12 +238,14 @@ async function pack(src: string, stem: string, libmap: LibMap) {
   const use = used(scripts, libmap);
   const [css, js] = await Promise.all([styles(join(RT, 'thinkr.css')), runtime(join(RT, 'index.ts'), ['nav', 'step', 'select', 'deselect', 'reveal', 'toggle', 'send'])]);
   const { at: href, files } = await assets(stem, { 'thinkr.css': css, 'thinkr.js': js });
+  // the spec as written, at a path that stays: an agent reads it with the Artifact tool's read, path spec.md
+  if (spec) files['spec.md'] = resolve(spec.file);
   // title first (the viewer reads it from the first 8 KB), then preloads so libraries download while the page
   // parses; the runtime goes after the content and before page scripts, so they can call thinkr.figure()
   const html = `${title}\n<meta name="claude:viewport-fit-sides" content="cover">\n${THEME}\n${preloads(use, libmap)}\n${FONTS}\n`
     + `<link rel="stylesheet" href="${href['thinkr.css']}">\n` + (math.css ? `<style>\n${math.css}</style>\n` : '')
     + math.html.trimEnd() + '\n'
-    + `<script>window.THINKR = ${JSON.stringify({ libs: libmap, use })};</script>\n<script src="${href['thinkr.js']}"></script>\n`
+    + `<script>window.THINKR = ${json({ libs: libmap, use, ...(spec ? { spec: spec.md } : {}) })};</script>\n<script src="${href['thinkr.js']}"></script>\n`
     + scripts;
   return { html, files };
 }
@@ -246,27 +258,35 @@ if (!file) process.exit(0);
 const src = await Bun.file(file).text();
 const stem = file.replace(/\.html?$/, '');
 const nodes = parse(src);
-const { errors, warns, mode, version } = check(src, nodes);
+const { errors, warns, mode, version } = check(src, nodes, await Bun.file(`${stem}.spec.md`).exists());
+const spec = mode === 'design' && !errors.length ? await readSpec(stem, version, errors, warns) : null;
 
-// a plan's changes: against the snapshot of the version before, kept beside the page (scripts/changes.ts)
+// a design's changes: against the snapshot of the version before, kept beside the page (scripts/changes.ts)
 const historyFile = Bun.file(`${stem}.history.json`);
 let changes: ReturnType<typeof track> | null = null;
-if (mode === 'plan' && !errors.length) {
+if (mode === 'design' && !errors.length) {
   const history = await historyFile.json().catch(() => null) as History | null;
   changes = track(src, nodes, version, history?.versions ? history : null);
   warns.push(...changes.warns);
   errors.push(...changes.errors);
 }
-// diagrams are drawn after the changes are marked, so a changed diagram's marks move to its drawing
-const drawn = errors.length ? '' : await drawDiagrams(changes?.html ?? src, errors);
+// diagrams are drawn after the changes are marked, so a changed diagram's marks move to its drawing. The spec goes in
+// after both, beside <t-page>: it is not part of the design, so it has no change marks of its own.
+let drawn = errors.length ? '' : await drawDiagrams(changes?.html ?? src, errors);
+if (spec && !errors.length) {
+  const at = drawn.lastIndexOf('</t-page>') + '</t-page>'.length;
+  const html = await drawDiagrams(spec.html, errors, 'spec');
+  drawn = drawn.slice(0, at) + `\n<t-spec hidden data-version="${spec.designVersion}">\n${html}</t-spec>` + drawn.slice(at);
+}
 for (const w of warns) console.log('  warn  ' + w);
 for (const e of errors) console.log('  error ' + e);
 if (errors.length) { console.log(`${errors.length} error(s). Nothing written.`); process.exit(1); }
 
-const { html: out, files } = await pack(drawn, stem, libmap);
+const { html: out, files } = await pack(drawn, stem, libmap, spec);
 await Bun.write(`${stem}.artifact.html`, out);
 await Bun.write(`${stem}.preview.html`, preview(out));
 if (changes) await Bun.write(historyFile, JSON.stringify(changes.history));
 console.log(`ok    ${mode} page, ${warns.length} warning(s), ${Math.round(out.length / 1024)} KB`
   + (changes ? `\n      changes: ${changes.summary}` : '')
+  + (spec ? `\n      spec:    ${spec.file}, for version ${spec.designVersion}, ${spec.words} words` : '')
   + `\n${publishLines(stem, files)}\n      preview: ${stem}.preview.html`);

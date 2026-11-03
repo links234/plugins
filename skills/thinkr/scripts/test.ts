@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
-/* Runtime regression test: builds the two templates, drives them in headless Chrome, and checks what the
-   reader would see after each action. Run it after changing anything in runtime/ or scripts/changes.ts.
+/* Runtime regression test: builds the two templates, and the design with its spec (templates/spec.md), drives them
+   in headless Chrome, and checks what the reader would see after each action; and checks that the build refuses a
+   spec it should. Run it after changing anything in runtime/ or scripts/changes.ts and scripts/spec.ts.
 
      bun scripts/test.ts        # needs Chrome; set CHROME when it is not in a usual place */
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -13,14 +14,14 @@ findChrome();
 
 // Option labels with markup, which the template's plain labels leave untested. They go in before the first build,
 // so both versions have them and they are not a change.
-const PLAN_V1: [string | RegExp, string][] = [
+const DESIGN_V1: [string | RegExp, string][] = [
   ['<t-option value="bucket">Token bucket<small>', '<t-option value="bucket">Token bucket, one <code>EVALSHA</code> call<small>'],
   ['<t-option value="org">Organization<small>', '<t-option value="org"><b>Organization</b>, by <code>org_id</code><small>'],
 ];
 
-// The plan is tested at version 2: built once as the template, then changed as below and built again, so the build
+// The design is tested at version 2: built once as the template, then changed as below and built again, so the build
 // has a version to compare with and the page has Changes to pick.
-const PLAN_V2: [string | RegExp, string][] = [
+const DESIGN_V2: [string | RegExp, string][] = [
   ['version="1"', 'version="2"'],
   ['  </header>\n', `  </header>
   <t-amends>
@@ -38,14 +39,26 @@ const PLAN_V2: [string | RegExp, string][] = [
   [/ *<li><a href="https:\/\/developer\.mozilla\.org\/en-US\/docs\/Web\/HTTP\/Headers\/Retry-After">[\s\S]*?<\/li>\n/, ''],
 ];
 
+// The spec case is the design with every question decided (gone from the page) and templates/spec.md beside it.
+const SPEC = await Bun.file(join(ROOT, 'templates/spec.md')).text();
+const decided = (src: string) => src.replace(/\n *<t-question[\s\S]*?<\/t-question>\n/g, '\n');
+// What the build must refuse: a spec beside open questions, or one that is stale, open or has no checks.
+const REFUSED: { name: string; page: (src: string) => string; spec: string; says: string }[] = [
+  { name: 'open questions', page: (src) => src, spec: SPEC, says: 'A spec is written once every question is decided, and 4 are still open' },
+  { name: 'newer than the page', page: decided, spec: SPEC.replace('design-version: 1', 'design-version: 2'), says: 'design-version: 2 is newer than the page' },
+  { name: 'no front matter', page: decided, spec: SPEC.replace(/^---[\s\S]*?---\n/, ''), says: 'front matter block' },
+  { name: 'left open', page: decided, spec: SPEC.replace('## Out of scope', '## Out of scope\n\n- Limits by plan: TBD.'), says: 'leaves something open' },
+  { name: 'no checks', page: decided, spec: SPEC.replace('## Done when', '## Checks'), says: 'add a "## Done when" section' },
+];
+
 // Each case runs in the page; `r` collects facts, `expect` lists what they must be, and `budget` caps timings
 // in ms: t(fn) times the synchronous work a click or input does before the browser can paint the result. An
 // interaction must fit well inside one 60 Hz frame (16.7 ms), so the next frame already shows its result.
 const BUDGET = { boot: 30, interaction: 12 };
 // `prime` runs on a first load and the page is opened again, as a reader coming back would open it. `viewer` runs
 // before the page's own scripts on every load.
-const cases: Record<string, { viewer?: string; prime?: string; run: string; expect: Record<string, unknown>; budget: Record<string, number> }> = {
-  plan: {
+const cases: Record<string, { viewer?: string; prime?: string; hash?: string; run: string; expect: Record<string, unknown>; budget: Record<string, number> }> = {
+  design: {
     // A stand-in for the claude.ai viewer: the page database in memory (__docs), a reader "u_me", and a comments
     // capability that records each send's text, or fails once with rate_limited when __fail is set.
     viewer: `(() => {
@@ -64,7 +77,7 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       const user = { id: async () => 'u_me', can: async () => true };
       window.claude = { use: async (name) => ({ db, comments, user })[name] ?? null };
     })();`,
-    prime:`localStorage.setItem('thinkr:api-rate-limits:plan:seen', '1')`, // this reader last saw version 1
+    prime:`localStorage.setItem('thinkr:api-rate-limits:design:seen', '1')`, // this reader last saw version 1
     budget: { boot: BUDGET.boot, select: BUDGET.interaction, step: BUDGET.interaction, panel: BUDGET.interaction, toc: BUDGET.interaction, change: BUDGET.interaction },
     run: `
       ms.select = t(() => $('#algorithm--bucket').click());
@@ -80,7 +93,7 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       r.offAtStep1 = part.classList.contains('is-off');
       ms.step = t(() => $('#flow-fig [aria-label="Next step"]').click());
       r.onAtStep2 = !part.classList.contains('is-off');
-      r.saved = Object.keys(JSON.parse(localStorage.getItem('thinkr:api-rate-limits:plan')).answers).length;
+      r.saved = Object.keys(JSON.parse(localStorage.getItem('thinkr:api-rate-limits:design')).answers).length;
       r.refHost = $('t-refs .t-host').textContent;
       // a Mermaid block is drawn at build, so no mermaid block is left for the viewer to draw
       r.diagram = !!$('#flow ~ .k-dia svg.pele-flowchart .pele-node.new') && !document.querySelector('pre.mermaid');
@@ -106,7 +119,7 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       r.panelWarn = !$('.t-composer-warn').hidden && $('.t-composer-warn span').textContent;
       const box = $('#t-composer-text');
       box.value = 'Ship it after the load test.'; box.dispatchEvent(new Event('input'));
-      r.draft = JSON.parse(localStorage.getItem('thinkr:api-rate-limits:plan:message'));
+      r.draft = JSON.parse(localStorage.getItem('thinkr:api-rate-limits:design:message'));
       form.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       r.escCloses = !form.classList.contains('is-open');
       $('.t-dock > .k-btn:not(.is-primary)').click();
@@ -175,7 +188,7 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       r.chgFold = $('.t-chg-items').hidden;
       $('.t-chg-vbtn').click();
       r.chgUnfold = !$('.t-chg-items').hidden;
-      r.chgSeen = JSON.parse(localStorage.getItem('thinkr:api-rate-limits:plan:seen'));
+      r.chgSeen = JSON.parse(localStorage.getItem('thinkr:api-rate-limits:design:seen'));
 
       // sends: each lists the answers that changed since the last send that reached Claude, and names the rest
       const submit = async (approve) => {
@@ -197,7 +210,7 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       r.sendRetry = await submit(false);`,
     expect: {
       badge: 'Answered', count: '1/4', maxDisabled: true, otherShown: true, otherHidden: true, offAtStep1: true, onAtStep2: true, saved: 4, refHost: 'redis.io', diagram: true, fitsContent: true, zoomed: '150%', reset: '100%', taller: true,
-      panel: 'Approve plan', panelWarn: '1 question is still open.', draft: 'Ship it after the load test.', escCloses: true,
+      panel: 'Approve design', panelWarn: '1 question is still open.', draft: 'Ship it after the load test.', escCloses: true,
       sendPanel: 'Send feedback', sendNoWarn: true, draftKept: 'Ship it after the load test.', outsideCloses: true,
       tocEntries: 7, tocSub: 4, tocDone: 3, railNotches: true, tocMidGlide: true, tocLands: true, tocHash: '#references', pinOn: 'Rollout', pinHeld: 'Rollout', flashed: true, wheelReleases: true, nextOpen: true,
       chgEntries: 2, chgNew: '2 2', chgRail: 'sticky', chgMarked: 4, chgQuiet: true, chgHeading: 'How a request is checked', chgPos: '1 / 3', chgLit: 3, chgShown: true,
@@ -210,6 +223,44 @@ const cases: Record<string, { viewer?: string; prime?: string; run: string; expe
       sendChanged: 'Feedback on: API Rate Limits (v2) | Q1 Which algorithm should count requests? | Q4 Which customers need a higher limit from day one? | Answers unchanged since the last send: Q2, Q3. | Full answers: responses/u_me in the page database.',
       sendFailed: true,
       sendRetry: 'Feedback on: API Rate Limits (v2) | Q3 When Redis does not answer within 20 ms, what should the gateway do? | Q4 Which customers need a higher limit from day one? | Answers unchanged since the last send: Q1, Q2. | Full answers: responses/u_me in the page database.',
+    },
+  },
+  spec: {
+    // the clipboard, recorded, so Copy Markdown can be read back
+    viewer: `Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text) => { window.__copied = text; } } });`,
+    hash: '#spec', // the link guided-review gives: the page opens on the spec
+    budget: { boot: BUDGET.boot, view: BUDGET.interaction },
+    run: `
+      r.openedOnSpec = !$('#t-spec-view').hidden && $('#t-design-view').hidden && document.documentElement.classList.contains('t-in-spec');
+      r.tabs = [...document.querySelectorAll('.t-views button')].map((b) => b.textContent + ' ' + b.getAttribute('aria-selected')).join(', ');
+      r.barBadge = $('.t-bar-title .k-badge').textContent;
+      r.titleHidden = !$('.t-bar').classList.contains('is-scrolled');
+      r.specTitle = $('t-spec h1').textContent;
+      r.specFor = $('t-spec .t-eyebrow span:nth-child(2)').textContent;
+      r.specToc = [...document.querySelectorAll('#t-spec-view .t-toc a')].map((a) => a.textContent).join(', ');
+      // a table, a Mermaid diagram drawn at build, highlighted code, a link out
+      r.specParts = [!!$('t-spec .t-scroll table'), !!$('t-spec .k-dia svg'), !!$('t-spec .t-code .hljs-keyword'), !!$('t-spec a.t-ext')].join(' ');
+      r.dockAway = getComputedStyle($('.t-dock')).display;
+      $('.t-spec-copy').click();
+      await new Promise((ok) => setTimeout(ok, 50));
+      r.copied = window.__copied === THINKR.spec && window.__copied.length;
+
+      // the switch: each view keeps where the reader was, and the hash follows the view
+      const [design, spec] = document.querySelectorAll('.t-views button');
+      ms.view = t(() => design.click());
+      r.backToDesign = !$('#t-design-view').hidden && $('#t-spec-view').hidden && location.hash === '' && $('.t-bar-title .k-badge').textContent;
+      r.noProgress = $('.t-progress').hidden; // every question is decided
+      scrollTo(0, 600);
+      await new Promise((ok) => setTimeout(ok, 100));
+      spec.click();
+      r.specFromTop = scrollY;
+      r.specHash = location.hash;
+      design.click();
+      r.keptScroll = scrollY;`,
+    expect: {
+      openedOnSpec: true, tabs: 'Design false, Spec true', barBadge: 'Spec', titleHidden: true, specTitle: 'API Rate Limits', specFor: 'For version 1 of the design',
+      specToc: 'Context, Decisions, Behavior, Interfaces, Work, Out of scope, Done when', specParts: 'true true true true', dockAway: 'none', copied: SPEC.length,
+      backToDesign: 'Design', noProgress: true, specFromTop: 0, specHash: '#spec', keptScroll: 600,
     },
   },
   explain: {
@@ -248,24 +299,36 @@ try {
     let src = await Bun.file(file).text();
     for (const [from, to] of edits) {
       const hit = typeof from === 'string' ? from : from.exec(src)?.[0];
-      if (!hit || !src.includes(hit)) { console.log(`fail  plan: the template no longer has ${from}; update ${list}`); process.exit(1); }
+      if (!hit || !src.includes(hit)) { console.log(`fail  design: the template no longer has ${from}; update ${list}`); process.exit(1); }
       src = src.replace(hit, to);
     }
     await Bun.write(file, src);
   };
+  for (const r of REFUSED) {
+    const stem = join(tmp, 'refused-' + r.name.replace(/\W+/g, '-'));
+    await Bun.write(`${stem}.html`, r.page(await Bun.file(join(ROOT, 'templates/design.html')).text()));
+    await Bun.write(`${stem}.spec.md`, r.spec);
+    const out = Bun.spawnSync(['bun', join(ROOT, 'scripts/build.ts'), `${stem}.html`]);
+    const ok = out.exitCode === 1 && out.stdout.toString().includes(r.says);
+    if (!ok) { failed++; console.log(`fail  spec refused, ${r.name}: expected an error with "${r.says}", got:\n${out.stdout}`); }
+  }
+  if (!failed) console.log(`ok    spec refused (${REFUSED.length} cases)`);
+
   for (const [name, c] of Object.entries(cases)) {
-    // built in the temp folder, so the history file the build keeps for a plan never lands in templates/
+    // built in the temp folder, so the history file the build keeps for a design never lands in templates/
     const file = join(tmp, `${name}.html`);
-    await Bun.write(file, Bun.file(join(ROOT, `templates/${name}.html`)));
-    if (name === 'plan') await edit(file, PLAN_V1, 'PLAN_V1');
+    const from = name === 'spec' ? 'design' : name;
+    await Bun.write(file, Bun.file(join(ROOT, `templates/${from}.html`)));
+    if (name === 'spec') { await Bun.write(file, decided(await Bun.file(file).text())); await Bun.write(join(tmp, 'spec.spec.md'), SPEC); }
+    if (name === 'design') await edit(file, DESIGN_V1, 'DESIGN_V1');
     build(file);
-    if (name === 'plan') {
-      await edit(file, PLAN_V2, 'PLAN_V2');
+    if (name === 'design') {
+      await edit(file, DESIGN_V2, 'DESIGN_V2');
       build(file);
     }
     const chromeTab = await browser(join(tmp, 'profile-' + name));
     try {
-      const url = 'file://' + join(tmp, `${name}.preview.html`);
+      const url = 'file://' + join(tmp, `${name}.preview.html`) + (c.hash ?? '');
       if (c.viewer) await chromeTab.send('Page.addScriptToEvaluateOnNewDocument', { source: c.viewer });
       await chromeTab.open(url);
       if (c.prime) { await chromeTab.run(c.prime); await chromeTab.open(url); }
@@ -291,7 +354,7 @@ try {
       chromeTab.close();
     }
   }
-  failed += await themeChecks('file://' + join(tmp, 'plan.preview.html'), join(tmp, 'profile-theme'));
+  failed += await themeChecks('file://' + join(tmp, 'design.preview.html'), join(tmp, 'profile-theme'));
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

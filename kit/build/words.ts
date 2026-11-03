@@ -1,4 +1,4 @@
-/* Lining up two lists, for the builds that mark what changed: thinkr between versions of a plan, guided-review
+/* Lining up two lists, for the builds that mark what changed: thinkr between versions of a design, guided-review
    between the old and new renders of a Markdown file. */
 
 export type Op = ['=' | '-' | '+', number, number];

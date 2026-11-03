@@ -1,6 +1,6 @@
-/* <t-question>: single, multi (with an optional max) or text. In a plan each question has an Other row and an
+/* <t-question>: single, multi (with an optional max) or text. In a design each question has an Other row and an
    optional note; with answer="…" a question becomes a self-check that marks the right options and opens its
-   <t-explain>. Answers live in localStorage, and in the page database for plans (feedback.ts). */
+   <t-explain>. Answers live in localStorage, and in the page database for designs (feedback.ts). */
 import type { Mode } from './types';
 import { h, slug, store } from '../kit/web/dom';
 import { ICON } from '../kit/web/icons';
@@ -12,7 +12,7 @@ export interface Answer { values: string[]; other: string; note: string; text: s
 export interface AnswerReport { question: string; type: QType; values: string[]; labels: string[]; other: string; text: string; note: string; recommended: string | null }
 export interface Question {
   el: HTMLElement; id: string; quiz: boolean;
-  /** "Q2" in a plan, "" for a self-check. */
+  /** "Q2" in a design, "" for a self-check. */
   num: string;
   /** The short label for "On this page": the toc attribute, else the question text. */
   label: string;
@@ -93,14 +93,14 @@ export function createQuestions(page: HTMLElement, mode: Mode, key: string) {
     q.append(opts);
     if (explain) q.append(explain);
 
-    // footer: Check for self-checks, a note for plan questions
+    // footer: Check for self-checks, a note for design questions
     const foot = h('div', { class: 't-qfoot', 'data-uncommentable': '' });
     const verdict = h('span', { class: 't-verdict', 'aria-live': 'polite' });
     const checkBtn = h('button', { class: 'k-btn is-sm', type: 'button' }, 'Check');
     if (quiz) {
       checkBtn.addEventListener('click', () => (q.classList.contains('is-checked') ? reset() : check()));
       foot.append(checkBtn, verdict);
-    } else if (type !== 'text' && mode === 'plan') {
+    } else if (type !== 'text' && mode === 'design') {
       const noteBox = h('textarea', { class: 't-field', id: id + '--note', rows: 2, placeholder: 'Why, or anything Claude should know', hidden: !a.note });
       noteBox.value = a.note;
       const noteBtn = h('button', { class: 'k-btn is-ghost is-sm', type: 'button' }, a.note ? 'Note' : 'Add a note');

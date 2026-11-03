@@ -149,6 +149,14 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
   if (guide.name != null && (!String(guide.name).trim() || words(guide.name) > 5)) err('name is the page\'s name in the gallery: 2 to 4 words, such as "Webhook retries review".');
   if (!multi && pr.number == null && guide.name == null) warn('Give a guide with no pull request number a name (2 to 4 words); the page is called "Review of <branch>" otherwise.');
   if (guide.diffStyle != null && guide.diffStyle !== 'unified' && guide.diffStyle !== 'split') err('diffStyle must be "unified" or "split".');
+  // the spec the change was built from: a thinkr design page, opened on its Spec view
+  const spec = guide.spec;
+  let specUrl = '';
+  if (spec != null) {
+    if (!/^https:\/\//.test(spec.url ?? '')) err('spec.url is the design page\'s link, starting with https://.');
+    else specUrl = spec.url.includes('#') ? spec.url : spec.url + '#spec';
+    if (spec.version != null && !(Number.isInteger(spec.version) && spec.version > 0)) err('spec.version is the design version the spec implements, a whole number.');
+  }
   const ov = guide.overview ?? ({} as Guide['overview']);
   if (!ov.summary) err('overview.summary is missing: say what the pull request changes in 2 to 4 sentences.');
   else if (words(paras(ov.summary).join(' ')) > 80) warn(`overview.summary has ${words(paras(ov.summary).join(' '))} words. Keep it under 80; the chapters carry the detail.`);
@@ -364,6 +372,7 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     `<span>${diff.files.length} file${diff.files.length === 1 ? '' : 's'}</span>`,
     `<span>${statHtml(total[0], total[1])}</span>`,
     `<span>written for ${headLink}</span>`,
+    specUrl ? `<span>built from <a href="${esc(specUrl)}" target="_blank" rel="noopener">its spec${spec?.version ? `, design v${spec.version}` : ''}</a></span>` : '',
   ].filter(Boolean).join('');
   const ofWhat = pr.url ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">${num}</a>` : esc(branch ?? 'the branch');
   const keys = `<kbd>j</kbd> <kbd>k</kbd> next and previous chapter · <kbd>r</kbd> mark the chapter reviewed${multi ? ' · <kbd>[</kbd> <kbd>]</kbd> previous and next pull request' : ''} · <kbd>b</kbd> chapter text or file tree · <kbd>c</kbd> show or hide comments · shift-click a fold to open it all`;
@@ -380,7 +389,8 @@ function buildPr(guide: Guide, diff: Diff, index: number): Built {
     meta, sections: sections.join('\n'),
     diffView: `<div class="gr-view gr-diff" hidden><aside class="gr-tree"><h3>${diff.files.length} files</h3><div class="gr-tree-host"></div></aside><div class="gr-diff-cards"></div></div>`,
     footer: `<footer class="gr-foot"><span>Guided review of ${ofWhat} at ${headShort}, ${diff.base.slice(0, 7)}..${headShort}</span><span>${keys}</span></footer>`,
-    links: (links ? `<span class="gr-links">${links}</span>` : '')
+    links: (specUrl ? `<a class="k-btn is-sm" href="${esc(specUrl)}" target="_blank" rel="noopener" title="The spec this change was built from">Spec<span aria-hidden="true">↗</span></a>` : '')
+      + (links ? `<span class="gr-links">${links}</span>` : '')
       + (pr.url ? `<a class="k-btn is-sm is-primary" href="${esc(pr.url)}" target="_blank" rel="noopener"><span>Open ${num}<span class="long"> on GitHub</span></span><span aria-hidden="true">↗</span></a>` : ''),
     data: {
       id, prefix: P, key: `gr:${pr.number ?? branch ?? diff.head}`, number: pr.number ?? null, title: pr.title, head: diff.head,

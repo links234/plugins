@@ -1,4 +1,4 @@
-/* Changes, in plans: what Claude changed in each version and why, from the page's <t-amends>. Versions fold; each
+/* Changes, in designs: what Claude changed in each version and why, from the page's <t-amends>. Versions fold; each
    change is one row with its label. Opening a row says where it came from (the question and the reader's answer,
    or the comment) and why, lights the blocks build.ts tied to it (data-amend; scripts/changes.ts) with their marks
    (added words, removed words, removed blocks), and glides to the first; the bar then steps through them. One row

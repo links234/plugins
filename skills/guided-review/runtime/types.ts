@@ -106,6 +106,9 @@ export interface Guide {
   /** How code cards show a change at first: one column, or old and new side by side. Each reader can switch. */
   diffStyle?: DiffStyle;
   links?: { label: string; href: string }[];
+  /** The spec the change was built from: its thinkr design page (`url`, opened on its Spec view) and the design
+      version it implements. */
+  spec?: { url: string; version?: number };
   overview: { summary: Text; steps?: string[]; diagram: Diagram };
   chapters: Chapter[];
 }

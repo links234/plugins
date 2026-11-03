@@ -3,7 +3,7 @@
 ```html
 <title>API Rate Limits</title>            <!-- a name of 2 to 4 words, first thing in the file -->
 <style> /* optional page styles, using the tokens below */ </style>
-<t-page mode="plan" version="1">
+<t-page mode="design" version="1">
   <header>
     <h1>API Rate Limits</h1>
     <p class="lede">One paragraph: what this is and why it matters.</p>
@@ -20,7 +20,7 @@ URLs. Each `h2` becomes an entry in "On this page".
 
 | Attribute | Use |
 |---|---|
-| `mode="plan\|explain"` | Required. `plan` adds the dock (progress, Send feedback, Approve plan) and saves answers for Claude. |
+| `mode="design\|explain"` | Required. `design` adds the dock (progress, Send feedback, Approve design), saves answers for Claude, and shows the spec once there is one (`spec.md`). `plan`, its old name, still builds. |
 | `version="N"` | Required. Start at 1; add 1 on each republish. The header shows it and every send names it. |
 | `key="…"` | Optional storage key. Defaults to a slug of the `h1`. |
 
@@ -65,12 +65,12 @@ themes are handled; never write a literal color.
 | `type="single"` | One answer (radio). The default. |
 | `type="multi"` | Any number of answers (checkboxes). Add `max="2"` to cap it; the hint reads "Choose up to 2". |
 | `type="text"` | A free answer. `placeholder` sets the hint. |
-| `recommended="value"` | Your pick, shown with a badge. Always set it in a plan. |
+| `recommended="value"` | Your pick, shown with a badge. Always set it in a design. |
 | `toc="Counting algorithm"` | The question's 2 to 4 word label under its section in "On this page". Without it the question text is cut to fit. |
 | `answer="value"` or `answer="a,c"` | Makes it a self-check (explainers): **Check** marks right and wrong options and opens the `<t-explain>`. No Other row. |
-| `no-other` | Removes the Other row (plans get Other with a text field by default). |
+| `no-other` | Removes the Other row (designs get Other with a text field by default). |
 
 - The first `<p>` is the question: one sentence that names the decision.
 - Each `<t-option value>` keeps its `value` across versions. `value="other"` is reserved.
-- In a plan, each choice question has **Add a note** for the reader's reason.
+- In a design, each choice question has **Add a note** for the reader's reason.
 - `<t-explain>` inside a self-check holds the explanation shown after **Check**.
