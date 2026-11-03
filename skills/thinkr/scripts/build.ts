@@ -14,8 +14,9 @@
    library in the page), and every library the page uses is preloaded from the head, its whole import graph at once,
    so nothing waits on a request chain. Needs `bun install` in this skill's directory.
 
-   A design's spec, <page>.spec.md beside the page, is checked and rendered into the page's Spec view, and published
-   beside it as spec.md (scripts/spec.ts).
+   A design's two specs beside the page are checked: <page>.spec.md, for people, is rendered into the page's Spec
+   view, and <page>.agent-spec.md, for the agent that builds it, is published beside the page as agent-spec.md
+   (scripts/spec.ts).
 
    The font link, the shared stylesheet, the sounds, the library pinning and the diagrams come from the kit
    (kit/build/). */
@@ -26,7 +27,7 @@ import { need as needIn } from '../kit/build/deps';
 import { diagrams } from '../kit/build/diagram';
 import { type Node, parse } from './tree';
 import { type History, KINDS, track } from './changes';
-import { type Spec, readSpec } from './spec';
+import { type Specs, hasSpecs, readSpecs } from './spec';
 
 const RT = join(import.meta.dir, '..', 'runtime');
 const HOSTS = ['https://cdnjs.cloudflare.com/', 'https://cdn.jsdelivr.net/npm/', 'https://unpkg.com/'];
@@ -158,13 +159,13 @@ function check(src: string, nodes: Node[], spec: boolean) {
   if (mode === 'design') {
     // decided questions leave the page, so a later version may have none; a spec needs every one decided
     const open = qs.filter((q) => !('answer' in q.attrs));
-    if (spec && open.length) errors.push(`A spec is written once every question is decided, and ${open.length === 1 ? '1 is' : `${open.length} are`} still open (${open.map((q) => q.attrs.id).join(', ')}). Decide ${open.length === 1 ? 'it' : 'them'} first, or move the spec aside.`);
+    if (spec && open.length) errors.push(`The specs are written once every question is decided, and ${open.length === 1 ? '1 is' : `${open.length} are`} still open (${open.map((q) => q.attrs.id).join(', ')}). Decide ${open.length === 1 ? 'it' : 'them'} first, or move the specs aside.`);
     else if (!spec && !open.length && version === 1) errors.push('A design needs at least one <t-question> for the reader to answer.');
     if (qs.length > 7) warns.push(`${qs.length} questions. Ask only about forks that change what you build (2 to 5).`);
   } else if (mode === 'explain') {
     if (!by('t-figure').length) errors.push('An explainer is built on figures. Add at least one <t-figure>.');
     if (qs.some((q) => !('answer' in q.attrs))) warns.push('Explainer questions without answer="..." go nowhere. Use answer= for self-checks, or make it a design.');
-    if (spec) errors.push('A spec belongs to a design. Move the spec aside, or make the page mode="design".');
+    if (spec) errors.push('Specs belong to a design. Move them aside, or make the page mode="design".');
   }
 
   for (const f of by('t-figure')) {
@@ -229,7 +230,7 @@ function transpile(scripts: string) {
   });
 }
 
-async function pack(src: string, stem: string, libmap: LibMap, spec: Spec | null) {
+async function pack(src: string, stem: string, libmap: LibMap, spec: Specs | null) {
   const title = /<title>[\s\S]*?<\/title>/.exec(src)![0];
   const body = src.replace(title, '').trim();
   const at = body.search(/<script\b/);
@@ -238,14 +239,14 @@ async function pack(src: string, stem: string, libmap: LibMap, spec: Spec | null
   const use = used(scripts, libmap);
   const [css, js] = await Promise.all([styles(join(RT, 'thinkr.css')), runtime(join(RT, 'index.ts'), ['nav', 'step', 'select', 'deselect', 'reveal', 'toggle', 'send'])]);
   const { at: href, files } = await assets(stem, { 'thinkr.css': css, 'thinkr.js': js });
-  // the spec as written, at a path that stays: an agent reads it with the Artifact tool's read, path spec.md
-  if (spec) files['spec.md'] = resolve(spec.file);
+  // the agent spec as written, at a path that stays: an agent reads it with the Artifact tool's read, path agent-spec.md
+  if (spec) files['agent-spec.md'] = resolve(spec.agent.file);
   // title first (the viewer reads it from the first 8 KB), then preloads so libraries download while the page
   // parses; the runtime goes after the content and before page scripts, so they can call thinkr.figure()
   const html = `${title}\n<meta name="claude:viewport-fit-sides" content="cover">\n${THEME}\n${preloads(use, libmap)}\n${FONTS}\n`
     + `<link rel="stylesheet" href="${href['thinkr.css']}">\n` + (math.css ? `<style>\n${math.css}</style>\n` : '')
     + math.html.trimEnd() + '\n'
-    + `<script>window.THINKR = ${json({ libs: libmap, use, ...(spec ? { spec: spec.md } : {}) })};</script>\n<script src="${href['thinkr.js']}"></script>\n`
+    + `<script>window.THINKR = ${json({ libs: libmap, use, ...(spec ? { agentSpec: spec.agent.md } : {}) })};</script>\n<script src="${href['thinkr.js']}"></script>\n`
     + scripts;
   return { html, files };
 }
@@ -258,8 +259,8 @@ if (!file) process.exit(0);
 const src = await Bun.file(file).text();
 const stem = file.replace(/\.html?$/, '');
 const nodes = parse(src);
-const { errors, warns, mode, version } = check(src, nodes, await Bun.file(`${stem}.spec.md`).exists());
-const spec = mode === 'design' && !errors.length ? await readSpec(stem, version, errors, warns) : null;
+const { errors, warns, mode, version } = check(src, nodes, await hasSpecs(stem));
+const spec = mode === 'design' && !errors.length ? await readSpecs(stem, version, errors, warns) : null;
 
 // a design's changes: against the snapshot of the version before, kept beside the page (scripts/changes.ts)
 const historyFile = Bun.file(`${stem}.history.json`);
@@ -270,13 +271,13 @@ if (mode === 'design' && !errors.length) {
   warns.push(...changes.warns);
   errors.push(...changes.errors);
 }
-// diagrams are drawn after the changes are marked, so a changed diagram's marks move to its drawing. The spec goes in
-// after both, beside <t-page>: it is not part of the design, so it has no change marks of its own.
+// diagrams are drawn after the changes are marked, so a changed diagram's marks move to its drawing. The spec for
+// people goes in after both, beside <t-page>: it is not part of the design, so it has no change marks of its own.
 let drawn = errors.length ? '' : await drawDiagrams(changes?.html ?? src, errors);
 if (spec && !errors.length) {
   const at = drawn.lastIndexOf('</t-page>') + '</t-page>'.length;
-  const html = await drawDiagrams(spec.html, errors, 'spec');
-  drawn = drawn.slice(0, at) + `\n<t-spec hidden data-version="${spec.designVersion}">\n${html}</t-spec>` + drawn.slice(at);
+  const html = await drawDiagrams(spec.people.html, errors, 'spec');
+  drawn = drawn.slice(0, at) + `\n<t-spec hidden data-version="${spec.people.designVersion}">\n${html}</t-spec>` + drawn.slice(at);
 }
 for (const w of warns) console.log('  warn  ' + w);
 for (const e of errors) console.log('  error ' + e);
@@ -288,5 +289,5 @@ await Bun.write(`${stem}.preview.html`, preview(out));
 if (changes) await Bun.write(historyFile, JSON.stringify(changes.history));
 console.log(`ok    ${mode} page, ${warns.length} warning(s), ${Math.round(out.length / 1024)} KB`
   + (changes ? `\n      changes: ${changes.summary}` : '')
-  + (spec ? `\n      spec:    ${spec.file}, for version ${spec.designVersion}, ${spec.words} words` : '')
+  + (spec ? `\n      spec:    for version ${spec.people.designVersion}: ${spec.people.words} words for people, ${spec.agent.words} for the agent` : '')
   + `\n${publishLines(stem, files)}\n      preview: ${stem}.preview.html`);

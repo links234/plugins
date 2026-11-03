@@ -1,8 +1,9 @@
-/* The Spec view, on a design that has a spec: what an agent builds from, as build.ts rendered it from <page>.spec.md
-   (scripts/spec.ts). A Design | Spec switch in the bar swaps the page for the spec in the same reading column, with
-   its own "On this page"; the dock and Changes belong to the design and step aside. Each view keeps where the reader
-   was. #spec, or a link to one of the spec's headings, opens on it. Copy Markdown copies the file as written, the
-   document to hand an agent. */
+/* The Spec view, on a design that has its specs: what will happen once it is built, at a glance, as build.ts
+   rendered it from <page>.spec.md (scripts/spec.ts). A Design | Spec switch in the bar swaps the page for the spec in
+   the same reading column, with its own "On this page"; the dock and Changes belong to the design and step aside.
+   Each view keeps where the reader was. #spec, or a link to one of the spec's headings, opens on it. Copy agent spec
+   copies the other spec, <page>.agent-spec.md as written: the complete one an agent builds from, which the page does
+   not show. */
 import { copyText, h } from '../kit/web/dom';
 import { ICON } from '../kit/web/icons';
 import { sound } from '../kit/web/sound';
@@ -11,22 +12,22 @@ import { createToc } from './toc';
 
 type View = 'design' | 'spec';
 interface SpecOptions {
-  spec: HTMLElement; md: string; layout: HTMLElement; end: HTMLElement; badge: HTMLElement;
+  spec: HTMLElement; agentSpec: string; layout: HTMLElement; end: HTMLElement; badge: HTMLElement;
   /** Callouts, tables, code and links, made the way the design's are. */
   decorate(root: HTMLElement): void;
 }
 
-export function createSpec({ spec, md, layout, end, badge, decorate }: SpecOptions) {
+export function createSpec({ spec, agentSpec, layout, end, badge, decorate }: SpecOptions) {
   const view = h('div', { class: 't-layout t-spec-layout', id: 't-spec-view', hidden: true });
   layout.after(view);
   view.append(spec);
   spec.hidden = false; // the view hides it now
   decorate(spec);
-  const copy = h('button', { class: 'k-btn is-sm t-spec-copy', type: 'button', title: 'Copy the spec as Markdown, to hand to an agent', 'data-uncommentable': '' },
-    h('span', { class: 't-spec-icon', html: ICON.copy }), 'Copy Markdown');
-  copy.addEventListener('click', () => copyText(md).then(
-    () => { toast('Copied. Give it to an agent as its whole prompt.'); sound.play('select'); },
-    () => toast('Copy failed. Select the spec instead.'),
+  const copy = h('button', { class: 'k-btn is-sm t-spec-copy', type: 'button', title: 'Copy the complete spec an agent builds from, as Markdown', 'data-uncommentable': '' },
+    h('span', { class: 't-spec-icon', html: ICON.copy }), 'Copy agent spec');
+  copy.addEventListener('click', () => copyText(agentSpec).then(
+    () => { toast('Agent spec copied. Give it to an agent as its whole prompt.'); sound.play('select'); },
+    () => toast('Copy failed. The agent spec is agent-spec.md beside this page.'),
   ));
   spec.prepend(h('div', { class: 't-eyebrow' }, h('span', { class: 'k-badge' }, 'Spec'), h('span', {}, `For version ${spec.dataset.version} of the design`), copy));
   createToc(view, spec, [], new Set());

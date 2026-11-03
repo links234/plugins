@@ -59,7 +59,7 @@ function boot(page: HTMLElement) {
     createChanges({ layout, page, bar, end, key, version, jump: glideTo });
     createDock({ page, version, key, questions, onChange, jump: glideTo });
     const spec = document.querySelector<HTMLElement>('t-spec');
-    if (spec) createSpec({ spec, md: window.THINKR?.spec ?? '', layout, end, badge, decorate });
+    if (spec) createSpec({ spec, agentSpec: window.THINKR?.agentSpec ?? '', layout, end, badge, decorate });
   }
 
   const api: Thinkr = {

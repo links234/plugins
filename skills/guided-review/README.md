@@ -49,8 +49,8 @@ them:
   needs no checkout and touches none. Claude answers comments and changes no code. When you ask, your comments become a
   pending review on GitHub, which you submit there.
 - **Its spec**: a change built from a [thinkr](../thinkr) spec links to it. **Spec** in the bar opens the design page
-  on the spec that produced the change, and the header names the design version it implements. Claude reads the spec
-  too, and a chapter whose code departs from it says so.
+  on the spec that produced the change, and the header names the design version it implements. Claude reads the full
+  agent spec too, and a chapter whose code departs from it says so.
 - **Stacks**: one page can hold several pull requests, a stack or any set to review together. The title becomes a
   menu of them, a stack drawn from its base up, each with its branches, size and review progress; `[` and `]` move
   between them.

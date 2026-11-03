@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-/* Runtime regression test: builds the two templates, and the design with its spec (templates/spec.md), drives them
-   in headless Chrome, and checks what the reader would see after each action; and checks that the build refuses a
-   spec it should. Run it after changing anything in runtime/ or scripts/changes.ts and scripts/spec.ts.
+/* Runtime regression test: builds the two templates, and the design with its specs (templates/*spec.md), drives them
+   in headless Chrome, and checks what the reader would see after each action; and checks that the build refuses the
+   specs it should. Run it after changing anything in runtime/ or scripts/changes.ts and scripts/spec.ts.
 
      bun scripts/test.ts        # needs Chrome; set CHROME when it is not in a usual place */
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -39,16 +39,21 @@ const DESIGN_V2: [string | RegExp, string][] = [
   [/ *<li><a href="https:\/\/developer\.mozilla\.org\/en-US\/docs\/Web\/HTTP\/Headers\/Retry-After">[\s\S]*?<\/li>\n/, ''],
 ];
 
-// The spec case is the design with every question decided (gone from the page) and templates/spec.md beside it.
+// The spec case is the design with every question decided (gone from the page) and its two specs beside it:
+// templates/spec.md, for people, and templates/agent-spec.md, for the agent.
 const SPEC = await Bun.file(join(ROOT, 'templates/spec.md')).text();
+const AGENT = await Bun.file(join(ROOT, 'templates/agent-spec.md')).text();
 const decided = (src: string) => src.replace(/\n *<t-question[\s\S]*?<\/t-question>\n/g, '\n');
-// What the build must refuse: a spec beside open questions, or one that is stale, open or has no checks.
-const REFUSED: { name: string; page: (src: string) => string; spec: string; says: string }[] = [
-  { name: 'open questions', page: (src) => src, spec: SPEC, says: 'A spec is written once every question is decided, and 4 are still open' },
-  { name: 'newer than the page', page: decided, spec: SPEC.replace('design-version: 1', 'design-version: 2'), says: 'design-version: 2 is newer than the page' },
-  { name: 'no front matter', page: decided, spec: SPEC.replace(/^---[\s\S]*?---\n/, ''), says: 'front matter block' },
-  { name: 'left open', page: decided, spec: SPEC.replace('## Out of scope', '## Out of scope\n\n- Limits by plan: TBD.'), says: 'leaves something open' },
-  { name: 'no checks', page: decided, spec: SPEC.replace('## Done when', '## Checks'), says: 'add a "## Done when" section' },
+// What the build must refuse: specs beside open questions, one without the other, or one that is stale, open or (the
+// agent's) has no checks. A null spec is left out.
+const REFUSED: { name: string; page: (src: string) => string; spec: string | null; agent: string | null; says: string }[] = [
+  { name: 'open questions', page: (src) => src, spec: SPEC, agent: AGENT, says: 'The specs are written once every question is decided, and 4 are still open' },
+  { name: 'no agent spec', page: decided, spec: SPEC, agent: null, says: 'needs its agent spec' },
+  { name: 'no spec for people', page: decided, spec: null, agent: AGENT, says: 'needs its spec for people' },
+  { name: 'newer than the page', page: decided, spec: SPEC, agent: AGENT.replace('design-version: 1', 'design-version: 2'), says: 'design-version: 2 is newer than the page' },
+  { name: 'no front matter', page: decided, spec: SPEC.replace(/^---[\s\S]*?---\n/, ''), agent: AGENT, says: 'front matter block' },
+  { name: 'left open', page: decided, spec: SPEC, agent: AGENT.replace('## Out of scope', '## Out of scope\n\n- Limits by plan: TBD.'), says: 'leaves something open' },
+  { name: 'no checks', page: decided, spec: SPEC, agent: AGENT.replace('## Done when', '## Checks'), says: 'add a "## Done when" section' },
 ];
 
 // Each case runs in the page; `r` collects facts, `expect` lists what they must be, and `budget` caps timings
@@ -243,7 +248,7 @@ const cases: Record<string, { viewer?: string; prime?: string; hash?: string; ru
       r.dockAway = getComputedStyle($('.t-dock')).display;
       $('.t-spec-copy').click();
       await new Promise((ok) => setTimeout(ok, 50));
-      r.copied = window.__copied === THINKR.spec && window.__copied.length;
+      r.copied = window.__copied === THINKR.agentSpec && window.__copied.length; // the agent's, which the page does not show
 
       // the switch: each view keeps where the reader was, and the hash follows the view
       const [design, spec] = document.querySelectorAll('.t-views button');
@@ -259,7 +264,7 @@ const cases: Record<string, { viewer?: string; prime?: string; hash?: string; ru
       r.keptScroll = scrollY;`,
     expect: {
       openedOnSpec: true, tabs: 'Design false, Spec true', barBadge: 'Spec', titleHidden: true, specTitle: 'API Rate Limits', specFor: 'For version 1 of the design',
-      specToc: 'Context, Decisions, Behavior, Interfaces, Work, Out of scope, Done when', specParts: 'true true true true', dockAway: 'none', copied: SPEC.length,
+      specToc: 'What happens to a request, Budgets, What clients see, How it ships, Not in this change', specParts: 'true true true true', dockAway: 'none', copied: AGENT.length,
       backToDesign: 'Design', noProgress: true, specFromTop: 0, specHash: '#spec', keptScroll: 600,
     },
   },
@@ -307,7 +312,8 @@ try {
   for (const r of REFUSED) {
     const stem = join(tmp, 'refused-' + r.name.replace(/\W+/g, '-'));
     await Bun.write(`${stem}.html`, r.page(await Bun.file(join(ROOT, 'templates/design.html')).text()));
-    await Bun.write(`${stem}.spec.md`, r.spec);
+    if (r.spec != null) await Bun.write(`${stem}.spec.md`, r.spec);
+    if (r.agent != null) await Bun.write(`${stem}.agent-spec.md`, r.agent);
     const out = Bun.spawnSync(['bun', join(ROOT, 'scripts/build.ts'), `${stem}.html`]);
     const ok = out.exitCode === 1 && out.stdout.toString().includes(r.says);
     if (!ok) { failed++; console.log(`fail  spec refused, ${r.name}: expected an error with "${r.says}", got:\n${out.stdout}`); }
@@ -319,7 +325,11 @@ try {
     const file = join(tmp, `${name}.html`);
     const from = name === 'spec' ? 'design' : name;
     await Bun.write(file, Bun.file(join(ROOT, `templates/${from}.html`)));
-    if (name === 'spec') { await Bun.write(file, decided(await Bun.file(file).text())); await Bun.write(join(tmp, 'spec.spec.md'), SPEC); }
+    if (name === 'spec') {
+      await Bun.write(file, decided(await Bun.file(file).text()));
+      await Bun.write(join(tmp, 'spec.spec.md'), SPEC);
+      await Bun.write(join(tmp, 'spec.agent-spec.md'), AGENT);
+    }
     if (name === 'design') await edit(file, DESIGN_V1, 'DESIGN_V1');
     build(file);
     if (name === 'design') {

@@ -20,7 +20,7 @@ URLs. Each `h2` becomes an entry in "On this page".
 
 | Attribute | Use |
 |---|---|
-| `mode="design\|explain"` | Required. `design` adds the dock (progress, Send feedback, Approve design), saves answers for Claude, and shows the spec once there is one (`spec.md`). `plan`, its old name, still builds. |
+| `mode="design\|explain"` | Required. `design` adds the dock (progress, Send feedback, Approve design), saves answers for Claude, and shows its spec once there is one (`spec.md`). `plan`, its old name, still builds. |
 | `version="N"` | Required. Start at 1; add 1 on each republish. The header shows it and every send names it. |
 | `key="…"` | Optional storage key. Defaults to a slug of the `h1`. |
 

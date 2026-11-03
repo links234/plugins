@@ -8,10 +8,12 @@ Artifact.
   an optional message, and Claude picks up your answers in the session. Each new version lists what changed and why
   under **Changes**; click an entry to jump to the change, with the added words underlined and the removed ones
   struck through.
-- **Specs** come once a design is decided and approved: Claude writes down only what to build, the decisions as
-  facts, the behavior, the interfaces, the work and the checks that say it is done, with none of the talk that led
-  there. **Spec**, in the design page's bar, shows it; **Copy Markdown** copies it. A fresh agent with no other
-  context builds from it, and [guided-review](../guided-review) links the review of what it built back to it.
+- **Specs** come once a design is decided and approved, two of them, with none of the talk that led there. The
+  spec is for you: what will happen once it is built, at a glance, in short sentences beside a diagram, the schemas
+  and a table of cases. **Spec**, in the design page's bar, shows it. The agent spec is for the agent that builds
+  it: every decision, behavior, interface, piece of work and check, complete. The page does not show it; **Copy
+  agent spec** copies it. A fresh agent with no other context builds from it, and
+  [guided-review](../guided-review) links the review of what it built back to the spec.
 - **Explainer pages** teach one idea: diagrams you step through, WebGPU figures you can move, quick self-checks, and
   links to the sources behind every claim.
 
@@ -51,7 +53,8 @@ Ask in plain words. The skill triggers on designing, planning and explaining:
 
 Claude writes the page, checks it, publishes it, and gives you the link. On a design page, answer the questions and
 submit; Claude reads your answers and messages and updates the page. Once you approve it with nothing left open,
-Claude writes the spec, puts it under **Spec**, and asks for a go; then a fresh agent builds from the spec alone.
+Claude writes the specs, puts the one for you under **Spec**, and asks for a go; then a fresh agent builds from the
+agent spec alone.
 
 ### On the page
 
@@ -70,8 +73,8 @@ Every page gives its reader these, with nothing for Claude to write:
   and glides to the first; the bar then shows where they are (2 / 3) with previous, next and close (Esc). One row is
   open at a time; clicking it again closes it. Rows newer than the reader's last visit get a dot, and their count
   shows on the Changes button.
-- In a design with a spec, **Design | Spec** in the bar. Spec shows the spec in the same column, with its own "On
-  this page" and **Copy Markdown**; the dock and Changes step aside. Each view keeps its place, and a link that ends
+- In a design with its specs, **Design | Spec** in the bar. Spec shows the spec in the same column, with its own "On
+  this page" and **Copy agent spec**; the dock and Changes step aside. Each view keeps its place, and a link that ends
   in `#spec` opens on the spec.
 - Claude's own comment button (from the artifact viewer) works on any paragraph, figure, question or code line.
 
@@ -81,7 +84,7 @@ Run these in this folder, after `bun install`:
 
 | Command | Does |
 |---|---|
-| `bun run test` | Builds both templates, and the design with `templates/spec.md`, and drives them in headless Chrome over DevTools: behavior, no console errors, and timing budgets (startup ≤ 30 ms, each interaction ≤ 12 ms); checks the build refuses a spec beside an open question, or one that is stale or left open |
+| `bun run test` | Builds both templates, and the design with its two specs from `templates/`, and drives them in headless Chrome over DevTools: behavior, no console errors, and timing budgets (startup ≤ 30 ms, each interaction ≤ 12 ms); checks the build refuses specs beside an open question, one without the other, or one that is stale or left open |
 | `bun run typecheck` | `tsc` over the runtime and the scripts |
 | `bun run examples` | Builds `templates/design.html` and `templates/explain.html` |
 | `bun scripts/build.ts --refresh` | Moves motion, vgpu, d3 and Plot to their newest release that is at least 14 days old (the artifact rule); `--major` crosses a major version |
@@ -93,7 +96,7 @@ ticks and clicks under 100 ms, matched in loudness. UI sound should confirm, nev
 ```
 SKILL.md                          what Claude reads first
 references/                       authoring.md, figures.md, design.md, spec.md, vgpu.md
-templates/                        design.html, explain.html (working examples), spec.md (a spec)
+templates/                        design.html, explain.html (working examples), spec.md and agent-spec.md (its specs)
 runtime/                          TypeScript runtime, CSS, library pins
 kit/                              link to the shared kit: tokens, sounds, UI parts, build helpers
 scripts/                          build.ts with changes.ts, spec.ts and tree.ts, shot.ts (used by the skill); test.ts (maintenance)

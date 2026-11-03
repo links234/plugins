@@ -124,24 +124,26 @@ elements, without word marks, until the next version.
    thread open, so the reader sees the answer there too.
 7. Tell the user in one line that version N is up.
 
-## Approval and the spec
+## Approval and the specs
 
 **Approve design** sends `Approved: <title> (vN)` and writes `approved` into the reader's response.
 
 1. Check it names the current version. An approval of an older version is not an approval: ask in the chat.
 2. Read the answers sent with it; they are part of the approval. An answer it names as unchanged is the one the
    earlier send delivered. When it still answers a question, put the decision in the design as a new version, as
-   any answer, before the spec.
-3. Write the spec, `<name>.spec.md` beside the page, as [spec.md](spec.md) says. Its `design-version` is the page's
-   version once the answers sent with the approval are written in. Rebuild and publish the same file path with the
-   `files` map the build printed; the spec does not add a version.
+   any answer, before the specs.
+3. Write both specs beside the page, `<name>.spec.md` for people and `<name>.agent-spec.md` for the agent, as
+   [spec.md](spec.md) says. Their `design-version` is the page's version once the answers sent with the approval are
+   written in. Rebuild and publish the same file path with the `files` map the build printed; the specs do not add a
+   version.
 4. Reply in the thread in one line ("Approved v3. The spec is up under Spec; say go in the chat and a fresh agent
-   builds from it."). Resolve it once the user says go.
-5. Ask the user for a go in the chat. Do not start before it. After the go, hand the spec over as
-   [spec.md](spec.md#hand-it-over) says. The spec, not this conversation, is what gets built: when the work must
-   differ from it, change the spec (and the design, when a decision changes) and say so in the chat.
+   builds from the agent spec."). Resolve it once the user says go.
+5. Ask the user for a go in the chat. Do not start before it. After the go, hand the agent spec over as
+   [spec.md](spec.md#hand-it-over) says. The specs, not this conversation, are what gets built: when the work must
+   differ from them, change them (and the design, when a decision changes) and say so in the chat.
 
-A comment on the spec (the viewer's comment button works on it) wakes you like any other. Fix the spec, rebuild,
-publish, and reply in one line. A comment that reopens a decision reopens the design: move the spec aside, add a
-version with the question back on the page, publish it with `"spec.md": null` in `files` (a published file stays
-until a publish removes it), and write the spec again once it is decided.
+A comment on the spec (the viewer's comment button works on it) wakes you like any other. Fix the spec, and the agent
+spec where it says the same thing, rebuild, publish, and reply in one line. A comment that reopens a decision reopens
+the design: move both specs aside, add a version with the question back on the page, publish it with
+`"agent-spec.md": null` in `files` (a published file stays until a publish removes it), and write the specs again once
+it is decided.
