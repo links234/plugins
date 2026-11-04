@@ -13,8 +13,9 @@
    without .json. Exit code 1 when a guide has errors; warnings do not stop the build.
 
    Libraries (@pierre/diffs and @pierre/trees) resolve to the newest release that is at least 14 days old (the
-   artifact rule). A refresh runs on its own when libs.json is more than 7 days old, and is skipped quietly when
-   offline. Size: the page holds only its markup; the stylesheet, the runtime (with its sounds) and the data are files
+   artifact rule). A refresh runs on its own when libs.json is more than 7 days old, within the pinned minor, and is
+   skipped quietly when offline; --refresh also takes a newer minor, and then the page needs a look (scripts/shot.ts
+   fails when a card draws no code). Size: the page holds only its markup; the stylesheet, the runtime (with its sounds) and the data are files
    beside it, and Geist comes from Google Fonts. Speed: the runtime is bundled and minified, and every library the
    page uses is preloaded from the head with its whole import graph, so nothing waits on a request chain. Diagrams
    are drawn here with pele, into SVG in the kit's colors; the drawings ride in the data file, so the page loads no

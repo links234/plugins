@@ -107,7 +107,7 @@ Run these in this folder, after `bun install`:
 | `bun run test` | gather and build against a scratch repository (kinds, scopes, moves, refs, escaping, every refusal, a working tree's snapshot, a pull request from a stand-in for GitHub), then the demo in headless Chrome over DevTools: behavior, no console errors, and timing budgets (boot ≤ 30 ms, each interaction ≤ 12 ms) |
 | `bun run typecheck` | `tsc` over the runtime and the scripts |
 | `bun run example` | Builds the demo into `examples/demo.preview.html`, and the two stacked demo pull requests into `examples/stack.preview.html` |
-| `bun scripts/build.ts --refresh` | Moves @pierre/diffs and @pierre/trees to their newest release that is at least 14 days old (the artifact rule); `--major` crosses a major version |
+| `bun scripts/build.ts --refresh` | Moves @pierre/diffs and @pierre/trees to their newest release that is at least 14 days old (the artifact rule), skipping the releases `runtime/libs.json` lists as broken; `--major` crosses a major version. A build refreshes on its own only within each pin's minor, so run this, then `scripts/shot.ts`, to take a new minor |
 
 ```
 SKILL.md                          what Claude reads first
