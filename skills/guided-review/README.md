@@ -80,7 +80,7 @@ project).
 - [`gh`](https://cli.github.com), signed in, only for someone else's pull request.
 - Publishing uses Claude's Artifact tool, so guides are made in Claude Code or another Claude client that can publish
   Artifacts. Without it, Claude hands you the preview file, a full HTML document.
-- Optional: Google Chrome, for the screenshot check (`scripts/shot.ts`).
+- Optional: Google Chrome, for the screenshot check (`scripts/shot.ts`) and for checking a new @pierre/diffs or @pierre/trees release before the build pins it; without Chrome the pins stay as they are.
 
 ## Use
 
@@ -107,7 +107,7 @@ Run these in this folder, after `bun install`:
 | `bun run test` | gather and build against a scratch repository (kinds, scopes, moves, refs, escaping, every refusal, a working tree's snapshot, a pull request from a stand-in for GitHub), then the demo in headless Chrome over DevTools: behavior, no console errors, and timing budgets (boot ≤ 30 ms, each interaction ≤ 12 ms) |
 | `bun run typecheck` | `tsc` over the runtime and the scripts |
 | `bun run example` | Builds the demo into `examples/demo.preview.html`, and the two stacked demo pull requests into `examples/stack.preview.html` |
-| `bun scripts/build.ts --refresh` | Moves @pierre/diffs and @pierre/trees to their newest release that is at least 14 days old (the artifact rule), skipping the releases `runtime/libs.json` lists as broken; `--major` crosses a major version. A build refreshes on its own only within each pin's minor, so run this, then `scripts/shot.ts`, to take a new minor |
+| `bun scripts/build.ts --refresh` | Moves @pierre/diffs and @pierre/trees to their newest release that is at least 14 days old (the artifact rule) and that works: `scripts/verify.ts` opens the demo with each newer release in headless Chrome, light and dark, and a release whose file cards or tree do not draw goes into `runtime/libs.json`'s `skip` with the reason. A build does this on its own once a day, within each pin's major; `--major` crosses a major version |
 
 ```
 SKILL.md                          what Claude reads first
@@ -115,7 +115,7 @@ references/                       guide-format.md, writing.md, stack.md, comment
 examples/                         demo.guide.json, demo-43.guide.json, and demo/ (the demo's base, its head and the PR stacked on it)
 runtime/                          TypeScript runtime, CSS, library pins
 kit/                              link to the shared kit: tokens, sounds, UI parts, build helpers
-scripts/                          gather.ts, build.ts, shot.ts (used by the skill); test.ts, demo.ts (maintenance)
+scripts/                          gather.ts, build.ts, shot.ts (used by the skill); verify.ts (build.ts's check of a new library release); test.ts, demo.ts (maintenance)
 package.json, bun.lock            dev dependencies (TypeScript, Bun's types)
 ```
 

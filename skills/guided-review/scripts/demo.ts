@@ -42,8 +42,9 @@ export function makeDemoRepo(): string {
   return repo;
 }
 
-/** Gather the demo's diff and build its guide into <out>.artifact.html and <out>.preview.html. */
-export function buildDemo(out = join(ROOT, 'examples', 'demo'), quiet = false): { code: number; log: string } {
+/** Gather the demo's diff and build its guide into <out>.artifact.html and <out>.preview.html, with `env` added to the
+    environment of both steps. */
+export function buildDemo(out = join(ROOT, 'examples', 'demo'), quiet = false, env: Record<string, string> = {}): { code: number; log: string } {
   const repo = makeDemoRepo();
   try {
     const diff = join(repo, 'diff.json');
@@ -53,7 +54,7 @@ export function buildDemo(out = join(ROOT, 'examples', 'demo'), quiet = false): 
     ];
     let log = '';
     for (const cmd of steps) {
-      const p = Bun.spawnSync(cmd, { cwd: repo, stdout: quiet ? 'pipe' : 'inherit', stderr: quiet ? 'pipe' : 'inherit' });
+      const p = Bun.spawnSync(cmd, { cwd: repo, stdout: quiet ? 'pipe' : 'inherit', stderr: quiet ? 'pipe' : 'inherit', env: { ...process.env, ...env } });
       if (quiet) log += (p.stdout?.toString() ?? '') + (p.stderr?.toString() ?? '');
       if (p.exitCode) return { code: p.exitCode, log };
     }

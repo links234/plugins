@@ -2,14 +2,17 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** The Chrome binary: $CHROME, else the usual places. Exits with a hint when there is none. */
+/** The Chrome binary: $CHROME, else the usual places; null when there is none. */
+export const chromeBinary = (): string | null => [
+  process.env.CHROME,
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  Bun.which('google-chrome'), Bun.which('chromium'), Bun.which('chromium-browser'),
+].find((p): p is string => !!p && existsSync(p)) ?? null;
+
+/** The Chrome binary. Exits with a hint when there is none. */
 export function findChrome(): string {
-  const found = [
-    process.env.CHROME,
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    Bun.which('google-chrome'), Bun.which('chromium'), Bun.which('chromium-browser'),
-  ].find((p) => p && existsSync(p));
+  const found = chromeBinary();
   if (!found) { console.log('No Chrome found. Set CHROME=/path/to/chrome.'); process.exit(1); }
   return found;
 }

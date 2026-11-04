@@ -114,6 +114,8 @@ request: rebuilding from the same `guide.json` and publishing the same file keep
    Read every `warn` and fix the ones that are right: long chapters, a wide or crowded diagram, a hunk shown twice. It
    writes `<work>/guide.artifact.html` (to publish), `<work>/guide.files/` (its stylesheet, runtime and data,
    published with it) and `<work>/guide.preview.html` (to open locally), and prints the `files` map to publish with.
+   Once a day the build first checks any newer @pierre/diffs or @pierre/trees release in a page (`libs: checking …`),
+   which can add a minute; let it finish.
 5. **Look** on the first build: `bun ${CLAUDE_SKILL_DIR}/scripts/shot.ts <work>/guide.preview.html <work>/shots`,
    then read the PNGs. It exits 1 when a file card draws no code or the page logs an error, light or dark; then the
    pinned @pierre/diffs in `runtime/libs.json` is at fault, so say so and do not publish. Check that nothing overlaps, no row is cut off, and the page does not scroll sideways at

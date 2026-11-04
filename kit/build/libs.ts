@@ -6,21 +6,28 @@
    A library is an ES module (its whole static import graph goes in `modules`, so a page preloads it in one parallel
    round) or a single-file build that sets the window global `global`, after the libraries in `deps`. `lazy` names the
    dynamic imports the page always takes, as package/subpath ("shiki/core"): each joins `modules` with its own graph,
-   so a library that loads its parts on demand still arrives in one round. `skip` lists releases never to pin, each
-   one known not to work.
+   so a library that loads its parts on demand still arrives in one round. `skip` maps each release never to pin to
+   why it does not work.
 
    A refresh moves each to the newest release that is at least 14 days old (the artifact rule), stable only unless the
    pin is itself a prerelease, and whose import graph resolves on the CDN (a release published with unresolved
-   workspace: or catalog: dependencies does not). `--refresh` looks within the pin's major, or any major with `major`.
-   It also runs on its own when the file is more than 7 days old, but then only within the pin's minor: a new minor
-   can change how the library has to be called, so it waits for a `--refresh` and someone to look at the page (each
-   skill's shot.ts fails on a page that logs an error). Offline, the pins stay quietly. */
+   workspace: or catalog: dependencies does not). When the skill passes `verify`, the release must also work in one
+   of its pages: one that loads but does not draw goes into `skip` with the reason, and the next newest is tried.
+
+   With `verify`, a build refreshes on its own once a day, within the pin's major: a release that changes how the
+   library has to be called fails the check like any other. Without it, nothing would catch that, so a build
+   refreshes on its own once a week and only within the pin's minor, and `--refresh` looks within the major. `--major`
+   looks at any major. A release that cannot be checked (no Chrome, offline) leaves the pin as it is. KIT_LIBS_FROZEN=1
+   turns refreshing off, for the page a check builds. */
 
 const DAY = 86_400_000;
 
-type Lib = { pkg: string; version: string; url: string; global?: string; deps?: string[]; modules?: string[]; lazy?: string[]; skip?: string[] };
+type Lib = { pkg: string; version: string; url: string; global?: string; deps?: string[]; modules?: string[]; lazy?: string[]; skip?: Record<string, string> };
 type LibFile = { note: string; checked: string; libs: Record<string, Lib> };
 export type LibMap = Record<string, { url: string; global?: string; deps?: string[]; modules: string[] }>;
+/** Whether the release of library `name` at `url` works in a page of the skill: null when it does, else why not.
+    Throws when it cannot tell (no Chrome, a page that does not build), and then the pin stays. */
+export type Verify = (name: string, url: string) => Promise<string | null>;
 
 /** Semver order, prereleases included: 1.0.0-beta.2 < 1.0.0-beta.10 < 1.0.0-rc.1 < 1.0.0 < 1.0.1. */
 export function compare(a: string, b: string): number {
@@ -41,13 +48,16 @@ export function compare(a: string, b: string): number {
   return 0;
 }
 
-/** How far a refresh may move a pin: within its minor (the automatic one), its major (--refresh), or any (--major). */
+/** How far a refresh may move a pin: within its minor, its major, or any. */
 type Reach = 'minor' | 'major' | 'any';
 
-async function refresh(file: string, reach: Reach) {
+async function refresh(file: string, reach: Reach, verify: Verify | undefined, minAge: number) {
   const data: LibFile = await Bun.file(file).json();
-  const cutoff = Date.now() - 14 * DAY;
+  const cutoff = Date.now() - minAge * DAY;
   const changed: string[] = [];
+  // One check at a time: each builds and opens a page.
+  let queue: Promise<unknown> = Promise.resolve();
+  const check = (name: string, url: string) => { const p = queue.then(() => verify!(name, url)); queue = p.catch(() => {}); return p; };
   await Promise.all(Object.entries(data.libs).map(async ([name, lib]) => {
     let meta: { time?: Record<string, string> };
     try {
@@ -56,11 +66,12 @@ async function refresh(file: string, reach: Reach) {
       console.log(`  libs: ${name} not checked (${(e as Error).name}); keeping ${lib.version}`);
       return;
     }
+    const skipped = (v: string) => !!lib.skip && Object.hasOwn(lib.skip, v);
     // Stable releases in reach; a prerelease pin also takes newer prereleases of its own version.
     const main = lib.version.split('-')[0], pre = lib.version.includes('-');
     const [maj, min] = main.split('.');
     const fits = (v: string, t: string) => {
-      if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(v) || Date.parse(t) > cutoff || lib.skip?.includes(v)) return false;
+      if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(v) || Date.parse(t) > cutoff || skipped(v)) return false;
       const [vmaj, vmin] = v.split('.');
       if (reach !== 'any' && vmaj !== maj) return false;
       if (reach === 'minor' && vmin !== min) return false;
@@ -70,22 +81,41 @@ async function refresh(file: string, reach: Reach) {
       .map(([v]) => v).sort((a, b) => compare(b, a));
     if (reach === 'minor') {
       const minor = Object.entries(meta.time ?? {}).filter(([v, t]) => v.split('.')[0] === maj && v.split('.')[1] !== min && !v.includes('-')
-        && Date.parse(t) <= cutoff && !lib.skip?.includes(v) && compare(v, lib.version) > 0).map(([v]) => v).sort((a, b) => compare(b, a))[0];
+        && Date.parse(t) <= cutoff && !skipped(v) && compare(v, lib.version) > 0).map(([v]) => v).sort((a, b) => compare(b, a))[0];
       if (minor) console.log(`  libs: ${name} ${minor} is out; run with --refresh to move to it, then look at a page`);
     }
-    if (lib.global) {
-      if (newer[0]) { changed.push(`${name} ${lib.version} -> ${newer[0]}`); lib.version = newer[0]; }
-      return;
-    }
-    // The newest release whose graph resolves; else the pin, with its graph found again.
+    // The newest release that resolves and, with `verify`, works; else the pin, with its graph found again.
+    let blind = false;
     for (const v of [...newer, lib.version]) {
-      try {
-        lib.modules = await graph(lib.url.replace('{v}', v), lib.lazy ?? []);
-      } catch (e) {
-        console.log(`  libs: ${name} ${v} skipped (${(e as Error).message})`);
-        continue;
+      const pin = v === lib.version;
+      if (!pin && blind) continue;
+      const url = lib.url.replace('{v}', v);
+      let modules = lib.modules ?? [];
+      if (!lib.global) {
+        try {
+          modules = await graph(url, lib.lazy ?? []);
+        } catch (e) {
+          console.log(`  libs: ${name} ${v} skipped (${(e as Error).message})`);
+          continue;
+        }
       }
-      if (v !== lib.version) { changed.push(`${name} ${lib.version} -> ${v}`); lib.version = v; }
+      if (!pin && verify) {
+        console.log(`  libs: checking ${name} ${v} in a page`);
+        try {
+          const why = await check(name, url);
+          if (why) {
+            (lib.skip ??= {})[v] = why;
+            console.log(`  libs: ${name} ${v} does not work, so it goes into skip: ${why}`);
+            continue;
+          }
+        } catch (e) {
+          console.log(`  libs: ${name} ${v} not checked (${(e as Error).message}); keeping ${lib.version}`);
+          blind = true;
+          continue;
+        }
+      }
+      if (!lib.global) lib.modules = modules;
+      if (!pin) { changed.push(`${name} ${lib.version} -> ${v}`); lib.version = v; }
       break;
     }
   }));
@@ -118,12 +148,17 @@ async function graph(entry: string, lazy: string[]): Promise<string[]> {
   return [...seen];
 }
 
-/** The pinned libraries, refreshed first when `force` (within the major, or any with `major`), or within the minor when
-    the file is stale. */
-export async function libs(file: string, { force = false, major = false } = {}): Promise<LibMap> {
+/** The pinned libraries, refreshed first when `force` (within the major, or any with `major`) or when the file is
+    stale (each day within the major with `verify`, each week within the minor without). `minAge` is the artifact
+    rule's age, in days. */
+export async function libs(file: string, { force = false, major = false, verify, minAge = 14 }:
+  { force?: boolean; major?: boolean; verify?: Verify; minAge?: number } = {}): Promise<LibMap> {
   let data: LibFile = await Bun.file(file).json();
-  const stale = Date.now() - Date.parse(data.checked) > 7 * DAY || Object.values(data.libs).some((l) => !l.global && !l.modules?.length);
-  if (force || stale) { await refresh(file, major ? 'any' : force ? 'major' : 'minor'); data = await Bun.file(file).json(); }
+  const stale = Date.now() - Date.parse(data.checked) > (verify ? 1 : 7) * DAY || Object.values(data.libs).some((l) => !l.global && !l.modules?.length);
+  if (process.env.KIT_LIBS_FROZEN !== '1' && (force || stale)) {
+    await refresh(file, major ? 'any' : force || verify ? 'major' : 'minor', verify, minAge);
+    data = await Bun.file(file).json();
+  }
   return Object.fromEntries(Object.entries(data.libs).map(([k, { pkg: _p, version, url, modules, lazy: _l, skip: _s, ...rest }]) =>
     [k, { url: url.replace('{v}', version), modules: modules ?? [], ...rest }]));
 }

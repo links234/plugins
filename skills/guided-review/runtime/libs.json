@@ -1,5 +1,5 @@
 {
- "note": "scripts/build.ts refreshes these to the newest release that is at least 14 days old (the artifact rule): on its own within the pinned minor, with --refresh within the same major, with --major beyond it. Stable releases only, unless the pinned version is itself a prerelease. modules lists each library's whole static import graph, and the graph of each dynamic import in lazy, so a page preloads it in one parallel round. skip lists releases that do not work: @pierre/diffs 1.6.0 was published against @pierre/theming 1.0.1 but calls 1.0.2's createThemeResolver({ fallbackLoader }), so no theme resolves and every card stays empty; 1.6.3 was published with unresolved workspace: dependencies.",
+ "note": "scripts/build.ts refreshes these to the newest release that is at least 14 days old (the artifact rule) and that works in a guide: scripts/verify.ts opens the demo with each newer release in headless Chrome, light and dark, and pins it only when every file card and the file tree draw with no error or warning. A build does this on its own once a day within the pinned major; --major crosses a major. Stable releases only, unless the pinned version is itself a prerelease. modules lists each library's whole static import graph, and the graph of each dynamic import in lazy, so a page preloads it in one parallel round. skip maps each release that does not work to why; the check adds to it, and deleting an entry has it checked again.",
  "checked": "2026-11-04",
  "libs": {
   "diffs": {
@@ -15,10 +15,10 @@
     "@pierre/theme/pierre-dark",
     "@pierre/theme/pierre-light"
    ],
-   "skip": [
-    "1.6.0",
-    "1.6.3"
-   ],
+   "skip": {
+    "1.6.0": "published against @pierre/theming 1.0.1 but calls 1.0.2's createThemeResolver({ fallbackLoader }): UnregisteredThemeError: No loader registered for theme \"pierre-dark\", and every card stays empty",
+    "1.6.3": "published with unresolved workspace: dependencies, so it does not load from jsDelivr"
+   },
    "modules": [
     "https://cdn.jsdelivr.net/npm/@pierre/diffs@1.6.1/+esm",
     "https://cdn.jsdelivr.net/npm/@pierre/theming@1.0.2/+esm",

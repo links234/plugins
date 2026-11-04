@@ -13,9 +13,10 @@
    without .json. Exit code 1 when a guide has errors; warnings do not stop the build.
 
    Libraries (@pierre/diffs and @pierre/trees) resolve to the newest release that is at least 14 days old (the
-   artifact rule). A refresh runs on its own when libs.json is more than 7 days old, within the pinned minor, and is
-   skipped quietly when offline; --refresh also takes a newer minor, and then the page needs a look (scripts/shot.ts
-   fails when a card draws no code). Size: the page holds only its markup; the stylesheet, the runtime (with its sounds) and the data are files
+   artifact rule) and that works in a page: before a pin moves, scripts/verify.ts opens the demo with the release in
+   headless Chrome, and a release whose cards or tree do not draw goes into libs.json's skip list. A refresh runs on
+   its own when libs.json is more than a day old, within the pinned major, and keeps the pin when offline or without
+   Chrome; --major crosses a major version. Size: the page holds only its markup; the stylesheet, the runtime (with its sounds) and the data are files
    beside it, and Geist comes from Google Fonts. Speed: the runtime is bundled and minified, and every library the
    page uses is preloaded from the head with its whole import graph, so nothing waits on a request chain. Diagrams
    are drawn here with pele, into SVG in the kit's colors; the drawings ride in the data file, so the page loads no
@@ -30,6 +31,7 @@ import { libs, preloads } from '../kit/build/libs';
 import { diagrams } from '../kit/build/diagram';
 import { BELL, COMMENT, PANEL } from '../runtime/icons';
 import { previews } from './markdown';
+import { verifier } from './verify';
 
 const ROOT = join(import.meta.dir, '..');
 const RT = join(ROOT, 'runtime');
@@ -42,7 +44,7 @@ const opt = (name: string, fallback?: string) => {
   return argv[i].includes('=') ? argv[i].slice(name.length + 3) : (argv[i + 1] ?? fallback);
 };
 const flag = (f: string) => argv.includes(`--${f}`);
-const libmap = await libs(join(RT, 'libs.json'), { force: flag('refresh'), major: flag('major') });
+const libmap = await libs(join(RT, 'libs.json'), { force: flag('refresh'), major: flag('major'), verify: verifier() });
 if (!opt('guide') && !opt('stack')) {
   if (flag('refresh')) process.exit(0);
   console.log('usage: bun scripts/build.ts --diff=diff.json --guide=guide.json [--out=guide] [--check] [--repo=<checkout>]');
