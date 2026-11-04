@@ -115,7 +115,8 @@ request: rebuilding from the same `guide.json` and publishing the same file keep
    writes `<work>/guide.artifact.html` (to publish), `<work>/guide.files/` (its stylesheet, runtime and data,
    published with it) and `<work>/guide.preview.html` (to open locally), and prints the `files` map to publish with.
 5. **Look** on the first build: `bun ${CLAUDE_SKILL_DIR}/scripts/shot.ts <work>/guide.preview.html <work>/shots`,
-   then read the PNGs. Check that nothing overlaps, no row is cut off, and the page does not scroll sideways at
+   then read the PNGs. It exits 1 when a file card draws no code or the page logs an error, light or dark; then the
+   pinned @pierre/diffs in `runtime/libs.json` is at fault, so say so and do not publish. Check that nothing overlaps, no row is cut off, and the page does not scroll sideways at
    phone width. With a browser you can drive, click a few diagram nodes that have refs and check that each lands on the line
    it names. One pass, not a loop.
 6. **Publish** `<work>/guide.artifact.html` with the Artifact tool: `icon` `review`, `description` the pull request's

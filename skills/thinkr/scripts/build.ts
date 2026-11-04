@@ -6,7 +6,8 @@
      bun scripts/build.ts --refresh [--major]  # refresh libs only
 
    Libraries resolve to the newest stable release that is at least 14 days old (the artifact rule). A refresh
-   runs on its own when libs.json is more than 7 days old, and is skipped quietly when offline.
+   runs on its own when libs.json is more than 7 days old, within each pin's minor, and is skipped quietly when
+   offline; --refresh also takes a newer minor.
 
    Size: the page holds only its content. The stylesheet and the runtime (with its sounds) are files published
    beside it (page.files/, passed to the Artifact tool as `files`), and Geist comes from Google Fonts.

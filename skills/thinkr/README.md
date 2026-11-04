@@ -87,7 +87,7 @@ Run these in this folder, after `bun install`:
 | `bun run test` | Builds both templates, and the design with its two specs from `templates/`, and drives them in headless Chrome over DevTools: behavior, no console errors, and timing budgets (startup ≤ 30 ms, each interaction ≤ 12 ms); checks the build refuses specs beside an open question, one without the other, or one that is stale or left open |
 | `bun run typecheck` | `tsc` over the runtime and the scripts |
 | `bun run examples` | Builds `templates/design.html` and `templates/explain.html` |
-| `bun scripts/build.ts --refresh` | Moves motion, vgpu, d3 and Plot to their newest release that is at least 14 days old (the artifact rule); `--major` crosses a major version |
+| `bun scripts/build.ts --refresh` | Moves motion, vgpu, d3 and Plot to their newest release that is at least 14 days old (the artifact rule); `--major` crosses a major version. A build refreshes on its own only within each pin's minor |
 
 The look, the font link, the sounds, the bar and buttons, and the build and test helpers come from the shared
 [kit](../../kit), linked here as `kit/`; its README says how to change them. Sounds stay in one family: short, crisp
