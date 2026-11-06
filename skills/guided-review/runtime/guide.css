@@ -442,8 +442,15 @@ body.gr-diff-panel-closed .gr-tree { display: none; }
 .gr-inbox-head b { font-weight: 600; }
 /* one scroll for both lists, so a long Read list never squeezes the unread ones */
 .gr-inbox-scroll { overflow-y: auto; min-height: 0; }
-.gr-inbox-head.is-sub { min-height: 32px; border-top: 1px solid var(--border); color: var(--muted-fg); font-size: 12px; justify-content: flex-start; }
+/* the Read part's header folds it */
+.gr-inbox-head.is-sub { width: 100%; min-height: 34px; padding-left: 10px; border-top: 1px solid var(--border); color: var(--muted-fg); font-size: 12px; justify-content: flex-start; text-align: left; }
+.gr-inbox-head.is-sub:hover, .gr-inbox-head.is-sub:focus-visible { background: var(--muted); outline: none; }
+.gr-inbox-head.is-sub[aria-expanded="false"] { border-bottom: 0; }
+.gr-inbox-head.is-sub .chev { flex: none; display: grid; transition: transform .15s; }
+.gr-inbox-head.is-sub[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 .gr-inbox-head.is-sub b { color: var(--fg-2); font-size: 12px; }
+.gr-inbox-head.is-sub .n { font-variant-numeric: tabular-nums; }
+.gr-inbox-head.is-sub .hint { margin-left: auto; }
 .gr-inbox-list { padding: 4px; display: grid; gap: 2px; }
 .gr-inbox-item.is-read .gist { color: var(--fg-2); }
 .gr-inbox-item { display: grid; gap: 3px; width: 100%; padding: 8px 10px; border-radius: 8px; text-align: left; }
