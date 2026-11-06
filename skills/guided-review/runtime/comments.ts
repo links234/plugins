@@ -36,7 +36,7 @@ import { reveal as revealProse } from './prose';
 import { plainText, richText } from './rich';
 import { type Ctx, active, ctxOf, ctxs, diffOf, guideOf } from './ctx';
 import { choose, pin, renderDiff, show, view } from './nav';
-import { type Post, type Target, type Thread, authorOf, codeOf, keepLocal, mark, newId, onThreads, outgoing, placeOf, refFor, rowAt, rowsOf, saveSend, startThreads, threadOf, threadsOf, watchThreads } from './threads';
+import { type Post, type Target, type Thread, authorOf, codeOf, keepLocal, mark, newId, onThreads, outgoing, placeOf, refFor, rowAt, rowsOf, saveSend, startThreads, threadOf, threadsOf, watchThreads, whoOf } from './threads';
 
 const MAX_BYTES = 3900; // a comment holds 4 KiB
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -506,15 +506,15 @@ const noteText = (c: Ctx, text: string) => h('p', { class: 'gr-note-text' }, ric
 function postEl(c: Ctx, p: Post, threadHead: string) {
   const fresh = p.by === 'claude' && !read.has(p.id);
   const lit = flash?.ids.has(p.id) && Date.now() < flash.until;
-  return h('li', { class: `gr-post${p.by === 'claude' ? ' is-claude' : ''}${fresh ? ' is-unread' : ''}${lit ? ' is-flash' : ''}`, 'data-post-id': p.id },
+  return h('li', { class: `gr-post is-${whoOf(p.by, p.uid)}${fresh ? ' is-unread' : ''}${lit ? ' is-flash' : ''}`, 'data-post-id': p.id },
     h('div', { class: 'gr-post-by' }, h('b', { text: authorOf(p.by, p.uid) }), h('time', { datetime: p.at, text: when(p.at) }),
       p.by === 'claude' && p.head && p.head !== threadHead ? h('span', { class: 'gr-post-head', title: 'The head commit it answers on', text: p.head.slice(0, 7) }) : null,
       fresh ? h('span', { class: 'gr-chip is-new', text: 'New' }) : null),
     noteText(c, p.text));
 }
 function pendingPost(c: Ctx, el: HTMLElement, r: ReviewComment) {
-  if (editingHere(el, r.id)) return h('li', { class: 'gr-post is-editing', 'data-note-id': r.id }, editing!.form);
-  return h('li', { class: 'gr-post is-pending', 'data-note-id': r.id },
+  if (editingHere(el, r.id)) return h('li', { class: 'gr-post is-me is-editing', 'data-note-id': r.id }, editing!.form);
+  return h('li', { class: 'gr-post is-me is-pending', 'data-note-id': r.id },
     h('div', { class: 'gr-post-by' }, h('b', { text: 'You' }), h('span', { class: 'gr-chip is-pending', text: 'Queued' }), h('span', { class: 'gr-spacer' }),
       btn('Edit', { 'data-note-edit': r.id }),
       btn(sendWord(), { 'data-note-now': r.id, title: sendTitle('this reply') }),

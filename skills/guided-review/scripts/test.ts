@@ -934,6 +934,7 @@ async function runThreads(file: string) {
     await tab.open('file://' + file);
     take(await inPage(tab, `${helpers}
       r.otherReader = await until(() => box('t:cother')) && box('t:cother').querySelector('.gr-post-by b').textContent + ' ' + !!box('t:cother').querySelector('.gr-chip.is-outdated');
+      r.otherWho = box('t:cother').querySelector('.gr-post').className;
       r.notWhole = !box('t:bad1') && !box('t:bad2') && document.querySelectorAll('.gr-margin > .gr-thread').length === 5;
       $('[data-note-general]').click();
       await sleep(50);
@@ -952,6 +953,8 @@ async function runThreads(file: string) {
       put('comments/u_me/msgs/m1', { thread: mine, by: 'claude', text: 'Capped at an hour (backoff.ts:12).', at: new Date().toISOString(), head: 'c2c2c2c' });
       r.answer = await until(() => box('t:' + mine)?.querySelector('.gr-post.is-claude')) && [...box('t:' + mine).querySelectorAll('.gr-post-by b')].map((b) => b.textContent).join() + ' ' + box('t:' + mine).querySelector('.gr-post.is-claude .gr-note-text').textContent;
       r.answerToast = $('#k-toast')?.textContent;
+      // each post says whose it is, for its colors: the reader's own, and Claude's
+      r.who = [...box('t:' + mine).querySelectorAll('.gr-post')].map((p) => ['is-me', 'is-claude', 'is-other'].filter((c) => p.classList.contains(c)).join('+')).join();
       // the bell counts the thread, and its list goes to the answer and marks it read
       r.unread = $('.gr-bell-n').textContent + ' ' + !!box('t:' + mine).querySelector('.gr-post.is-unread .gr-chip.is-new');
       ms.bell = t(() => $('[data-bell]').click());
@@ -1072,8 +1075,8 @@ async function runThreads(file: string) {
   }
   report(name, tab, got, ms, {
     level: '0 true', movedLevel: '0 true', goneBeside: '0 true', foldReveal: true, outdated: 'false,false,true', goneCode: '+   const gone = true;', movedLabel: 'Line 33', movedLit: true,
-    otherReader: 'Reviewer true', notWhole: true, unread: '1 true', inbox: '1 Claude Capped at an hour (backoff.ts:12). | true',
-    bellGo: 'true,true,true,true,true,true', flash: 'true,true', flashGone: true, inboxEmpty: true, readFold: 'true', readList: 'true true', inboxClosed: true, sendWord: 'Send 1to Claude', sentRef: true, sentThread: true, mineShows: 'You', answer: 'You,Claude Capped at an hour (backoff.ts:12).', answerToast: 'Claude answered in a thread.',
+    otherReader: 'Reviewer true', otherWho: 'gr-post is-other', notWhole: true, unread: '1 true', inbox: '1 Claude Capped at an hour (backoff.ts:12). | true',
+    bellGo: 'true,true,true,true,true,true', flash: 'true,true', flashGone: true, inboxEmpty: true, readFold: 'true', readList: 'true true', inboxClosed: true, sendWord: 'Send 1to Claude', sentRef: true, sentThread: true, mineShows: 'You', answer: 'You,Claude Capped at an hour (backoff.ts:12).', answerToast: 'Claude answered in a thread.', who: 'is-me,is-claude',
     replyWord: 'Send', replyText: true, replyDoc: 'reply true Is the backoff capped? claude', replyShows: true, mark: true,
     flying: '1 true true', landed: true, failed: '1 true true Send 1to Claude 3',
     richLinks: 'src/webhooks/deliver.ts:31n src/webhooks/sign.ts:3n src/webhooks/backoff.ts:0n src/webhooks/queue.ts:0n https://github.com/example/webhooks/blob/HEAD/src/log.ts#L2 https://github.com/example/webhooks/blob/HEAD/src/log.ts https://example.com/a.ts:1 https://github.com/example/webhooks/blob/HEAD/y',

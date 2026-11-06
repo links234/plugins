@@ -114,6 +114,8 @@ export const threadsOf = (c: Ctx) => [...threads.values()].filter((t) => t.c ===
 export const threadOf = (id: string | undefined) => (id ? threads.get(id) : undefined);
 /** Who wrote a post, as the reader sees it. Names show where the page has the "profile" scope. */
 export const authorOf = (by: Author, uid: string | null) => (by === 'claude' ? 'Claude' : uid == null || uid === me ? 'You' : names[uid]?.name || 'Reviewer');
+/** Whose a post is, for its colors: Claude's, the reader's own, or another reader's. */
+export const whoOf = (by: Author, uid: string | null) => (by === 'claude' ? 'claude' : uid == null || uid === me ? 'me' : 'other');
 
 const str = (v: unknown): v is string => typeof v === 'string';
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);

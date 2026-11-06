@@ -13,17 +13,22 @@
   --del-bar: #d93636;
   --del-fg: #c02626;
   --flash: #fff4c2;
+  --who-me: var(--c1);
+  --who-claude: oklch(0.56 0.15 42);
+  --who-other: var(--c5);
   --text-col: 340px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --add-bg: #11261a; --add-bg-soft: #131d17; --add-bar: #2fb866; --add-fg: #4ade80;
     --del-bg: #2c1517; --del-bg-soft: #221618; --del-bar: #e5484d; --del-fg: #f87171; --flash: #3d3511;
+    --who-claude: oklch(0.74 0.13 50);
   }
 }
 :root[data-theme="dark"] {
   --add-bg: #11261a; --add-bg-soft: #131d17; --add-bar: #2fb866; --add-fg: #4ade80;
   --del-bg: #2c1517; --del-bg-soft: #221618; --del-bar: #e5484d; --del-fg: #f87171; --flash: #3d3511;
+  --who-claude: oklch(0.74 0.13 50);
 }
 
 body { font-size: 14px; line-height: 1.55; }
@@ -461,7 +466,7 @@ body.gr-diff-panel-closed .gr-tree { display: none; }
 .gr-inbox-item .where time { margin-left: auto; white-space: nowrap; }
 .gr-inbox-item .ask { color: var(--muted-fg); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gr-inbox-item .gist { color: var(--fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.gr-inbox-item .gist b { color: var(--c1); font-weight: 600; }
+.gr-inbox-item .gist b { color: var(--who-claude); font-weight: 600; }
 .gr-inbox-item .more { color: var(--c1); font-size: 12px; }
 .gr-inbox-empty { margin: 0; padding: 16px 14px; color: var(--muted-fg); }
 /* a phone: the list spans the screen under the bar, and the bar keeps room for the bell and Send by leaving out the
@@ -535,11 +540,14 @@ body.gr-diff-panel-closed .gr-tree { display: none; }
 .gr-thread:has(.gr-composer:focus-within) { outline: 2px solid var(--ring); outline-offset: 1px; }
 .gr-thread-gist { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .gr-thread .gr-note-head { flex-wrap: wrap; row-gap: 0; }
-.gr-posts { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 8px; }
-.gr-post + .gr-post { border-top: 1px solid var(--border); padding-top: 8px; }
+.gr-posts { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 6px; }
+/* Who wrote a post shows at a glance, so a long thread reads as turns: a rule down its left and its author's name in
+   the author's color (the reader blue, Claude clay, other readers violet), and Claude's posts on a faint wash. */
+.gr-post { --who: var(--who-other); padding: 4px 0 4px 10px; border-radius: 0 6px 6px 0; box-shadow: inset 2px 0 0 var(--who); }
+.gr-post.is-me { --who: var(--who-me); }
+.gr-post.is-claude { --who: var(--who-claude); background: color-mix(in oklch, var(--who-claude) 8%, transparent); }
 .gr-post-by { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 12.5px; color: var(--muted-fg); }
-.gr-post-by b { color: var(--fg); font-weight: 600; }
-.gr-post.is-claude .gr-post-by b { color: var(--c1); }
+.gr-post-by b { color: var(--who); font-weight: 600; }
 .gr-post-head { font: 11.5px var(--mono); color: var(--faint); }
 /* the answers the bell went to, lit for a moment so the eye finds them */
 @keyframes gr-post-flash {
