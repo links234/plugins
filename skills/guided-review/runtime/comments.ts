@@ -505,7 +505,8 @@ const when = (iso: string) => {
 const noteText = (c: Ctx, text: string) => h('p', { class: 'gr-note-text' }, richText(c, text));
 function postEl(c: Ctx, p: Post, threadHead: string) {
   const fresh = p.by === 'claude' && !read.has(p.id);
-  return h('li', { class: `gr-post${p.by === 'claude' ? ' is-claude' : ''}${fresh ? ' is-unread' : ''}` },
+  const lit = flash?.ids.has(p.id) && Date.now() < flash.until;
+  return h('li', { class: `gr-post${p.by === 'claude' ? ' is-claude' : ''}${fresh ? ' is-unread' : ''}${lit ? ' is-flash' : ''}`, 'data-post-id': p.id },
     h('div', { class: 'gr-post-by' }, h('b', { text: authorOf(p.by, p.uid) }), h('time', { datetime: p.at, text: when(p.at) }),
       p.by === 'claude' && p.head && p.head !== threadHead ? h('span', { class: 'gr-post-head', title: 'The head commit it answers on', text: p.head.slice(0, 7) }) : null,
       fresh ? h('span', { class: 'gr-chip is-new', text: 'New' }) : null),
@@ -728,6 +729,30 @@ async function reveal(key: string, always: boolean) {
   if (key.startsWith('t:')) markRead(key.slice(2));
   if (target && (always || folded || !onScreen(target))) pin(target, s.at === 'row' ? 'center' : 'start');
   relayout();
+}
+
+/** From the bell: open the thread, bring its first unread answer on screen and light its unread answers for a moment,
+    so the reader sees where to read from, even in a long thread. */
+const FLASH_MS = 1600;
+let flash: { ids: Set<string>; until: number } | null = null;
+async function goToAnswers(id: string) {
+  const t = threadOf(id);
+  if (!t) return;
+  const fresh = unreadIn(t).map((p) => p.id);
+  if (t.resolved) unfolded.add(id);
+  flash = { ids: new Set(fresh), until: Date.now() + FLASH_MS };
+  await reveal(`t:${id}`, true);
+  // The margin lays its boxes out in the next frame: the answer is where it will stay after that.
+  await new Promise(requestAnimationFrame);
+  await new Promise(requestAnimationFrame);
+  const first = $$<HTMLElement>('[data-post-id]').find((el) => el.dataset.postId === fresh[0] && el.offsetParent);
+  if (first && !onScreen(first)) pin(first, 'center');
+  const was = flash;
+  setTimeout(() => {
+    if (flash !== was) return;
+    flash = null;
+    for (const el of $$('.gr-post.is-flash')) el.classList.remove('is-flash');
+  }, FLASH_MS);
 }
 
 // ---------------------------------------------------------------- unread answers and the bell
@@ -1019,7 +1044,7 @@ document.addEventListener('click', (e) => {
   const t = el.closest<HTMLElement>('button');
   if (!t) return;
   if (t.hasAttribute('data-bell')) { setBell(!bellOpen()); sound.play('toggle'); }
-  else if (t.dataset.inbox) { setBell(false); void reveal(`t:${t.dataset.inbox}`, true); sound.play('nav'); }
+  else if (t.dataset.inbox) { setBell(false); void goToAnswers(t.dataset.inbox); sound.play('nav'); }
   else if (t.hasAttribute('data-inbox-all')) { for (const { t: th } of unread()) markRead(th.id); sound.play('select'); }
   else if (t.hasAttribute('data-notes-toggle')) { toggleNotes(); sound.play('toggle'); }
   else if (t.hasAttribute('data-note-file')) openFile(t.closest<HTMLElement>('.gr-file')!);
