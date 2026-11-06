@@ -733,9 +733,19 @@ async function reveal(key: string, always: boolean) {
 // ---------------------------------------------------------------- unread answers and the bell
 // An answer of Claude's is unread until the reader looks at its thread: a click on its box, or on it in the bell's
 // list. What they have read is kept in this browser, like the review marks. The bell in the bar counts the threads
-// with an unread answer and opens a list of them, newest first; a click on one goes to it.
-const READ = 'gr:read';
+// with an unread answer and opens a list of them, newest first; a click on one goes to it. Under them, the threads
+// whose answers the reader has read, the last read first, so one opened by mistake is still a click away.
+const READ = 'gr:read', SEEN = 'gr:seen';
 const read = new Set<string>((() => { const got = store.get<string[]>(READ); return Array.isArray(got) ? got : []; })());
+/** When the reader last read an answer in each thread, by thread id. */
+const seen = new Map<string, string>((() => {
+  const got = store.get<[string, string][]>(SEEN);
+  return Array.isArray(got) ? got.filter((x) => Array.isArray(x) && typeof x[0] === 'string' && typeof x[1] === 'string') : [];
+})());
+function readOnes() {
+  return ctxs.flatMap((c) => sentOf(c)).filter((t) => seen.has(t.id) && !unreadIn(t).length && t.posts.some((p) => p.by === 'claude'))
+    .sort((a, b) => (seen.get(a.id)! < seen.get(b.id)! ? 1 : -1));
+}
 const unreadIn = (t: Thread) => t.posts.filter((p) => p.by === 'claude' && !read.has(p.id));
 function unread() {
   return ctxs.flatMap((c) => sentOf(c).map((t) => ({ t, posts: unreadIn(t) })).filter((x) => x.posts.length))
@@ -747,6 +757,9 @@ function markRead(id: string) {
   if (!fresh.length) return;
   for (const p of fresh) read.add(p.id);
   store.set(READ, [...read].slice(-2000));
+  seen.delete(id);
+  seen.set(id, new Date().toISOString());
+  store.set(SEEN, [...seen].slice(-200));
   for (const el of $$<HTMLElement>('.gr-thread')) if (el.dataset.threadId === id) paintThread(el);
   paintBell();
   relayout();
@@ -765,9 +778,9 @@ function paintBell() {
 function paintInbox(list = unread()) {
   const box = inbox();
   if (!box) return;
-  const item = ({ t, posts }: { t: Thread; posts: Post[] }) => {
+  const item = ({ t, posts }: { t: Thread; posts: Post[] }, done = false) => {
     const last = posts.at(-1)!;
-    return h('button', { class: 'gr-inbox-item', type: 'button', 'data-inbox': t.id },
+    return h('button', { class: `gr-inbox-item${done ? ' is-read' : ''}`, type: 'button', 'data-inbox': t.id },
       h('span', { class: 'where' },
         ctxs.length > 1 && t.c.pr.number != null ? h('span', { class: 'n', text: `#${t.c.pr.number}` }) : null,
         h('b', { text: t.cm.path ? split(t.cm.path)[0] : 'The pull request' }),
@@ -775,13 +788,16 @@ function paintInbox(list = unread()) {
         h('time', { datetime: last.at, text: when(last.at) })),
       h('span', { class: 'ask', text: firstLine(plainText(t.cm.text), 90) }),
       h('span', { class: 'gist' }, h('b', { text: 'Claude ' }), plainText(last.text)),
-      posts.length > 1 ? h('span', { class: 'more', text: `${posts.length} new answers` }) : null);
+      !done && posts.length > 1 ? h('span', { class: 'more', text: `${posts.length} new answers` }) : null);
   };
-  box.replaceChildren(
+  const old = readOnes();
+  box.replaceChildren(h('div', { class: 'gr-inbox-scroll' },
     h('div', { class: 'gr-inbox-head' }, h('b', { text: 'Unread answers' }),
       list.length ? h('button', { class: 'k-btn is-ghost is-sm', type: 'button', 'data-inbox-all': '' }, 'Mark all read') : null),
-    list.length ? h('div', { class: 'gr-inbox-list' }, ...list.map(item))
-      : h('p', { class: 'gr-inbox-empty', text: 'No unread answers. When Claude answers one of your comments, it shows here until you read it.' }));
+    list.length ? h('div', { class: 'gr-inbox-list' }, ...list.map((x) => item(x)))
+      : h('p', { class: 'gr-inbox-empty', text: old.length ? 'No unread answers.' : 'No unread answers. When Claude answers one of your comments, it shows here until you read it.' }),
+    old.length ? h('div', { class: 'gr-inbox-head is-sub' }, h('b', { text: 'Read' }), h('span', { text: 'last read first' })) : null,
+    old.length ? h('div', { class: 'gr-inbox-list', 'data-inbox-read': '' }, ...old.map((t) => item({ t, posts: t.posts.filter((p) => p.by === 'claude') }, true))) : null));
 }
 function setBell(open: boolean, focusBell = false) {
   const box = inbox();

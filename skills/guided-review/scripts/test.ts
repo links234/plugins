@@ -965,6 +965,8 @@ async function runThreads(file: string) {
         mb.getBoundingClientRect().top < innerHeight && mb.getBoundingClientRect().bottom > 0, JSON.parse(localStorage.getItem('gr:read')).includes('m1')].join();
       $('[data-bell]').click();
       r.inboxEmpty = $('.gr-inbox-empty')?.textContent.startsWith('No unread answers');
+      // the answer just read is under Read, and kept in this browser with when it was read
+      r.readList = [...document.querySelectorAll('[data-inbox-read] .gr-inbox-item')].map((b) => b.dataset.inbox === mine).join() + ' ' + JSON.parse(localStorage.getItem('gr:seen')).some(([id]) => id === mine);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       r.inboxClosed = $('#gr-inbox').hidden;
       box('t:' + mine).querySelector('[data-thread-reply]').click();
@@ -1065,7 +1067,7 @@ async function runThreads(file: string) {
   report(name, tab, got, ms, {
     level: '0 true', movedLevel: '0 true', goneBeside: '0 true', foldReveal: true, outdated: 'false,false,true', goneCode: '+   const gone = true;', movedLabel: 'Line 33', movedLit: true,
     otherReader: 'Reviewer true', notWhole: true, unread: '1 true', inbox: '1 Claude Capped at an hour (backoff.ts:12). | true',
-    bellGo: 'true,true,true,true,true,true', inboxEmpty: true, inboxClosed: true, sendWord: 'Send 1to Claude', sentRef: true, sentThread: true, mineShows: 'You', answer: 'You,Claude Capped at an hour (backoff.ts:12).', answerToast: 'Claude answered in a thread.',
+    bellGo: 'true,true,true,true,true,true', inboxEmpty: true, readList: 'true true', inboxClosed: true, sendWord: 'Send 1to Claude', sentRef: true, sentThread: true, mineShows: 'You', answer: 'You,Claude Capped at an hour (backoff.ts:12).', answerToast: 'Claude answered in a thread.',
     replyWord: 'Send', replyText: true, replyDoc: 'reply true Is the backoff capped? claude', replyShows: true, mark: true,
     flying: '1 true true', landed: true, failed: '1 true true Send 1to Claude 3',
     richLinks: 'src/webhooks/deliver.ts:31n src/webhooks/sign.ts:3n src/webhooks/backoff.ts:0n src/webhooks/queue.ts:0n https://github.com/example/webhooks/blob/HEAD/src/log.ts#L2 https://github.com/example/webhooks/blob/HEAD/src/log.ts https://example.com/a.ts:1 https://github.com/example/webhooks/blob/HEAD/y',
