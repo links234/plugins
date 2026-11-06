@@ -534,6 +534,13 @@ body.gr-diff-panel-closed .gr-tree { display: none; }
 .gr-post-by b { color: var(--fg); font-weight: 600; }
 .gr-post.is-claude .gr-post-by b { color: var(--c1); }
 .gr-post-head { font: 11.5px var(--mono); color: var(--faint); }
+/* the answers the bell went to, lit for a moment so the eye finds them */
+@keyframes gr-post-flash {
+  0%, 45% { background-color: var(--flash); box-shadow: 0 0 0 5px var(--flash); }
+  100% { background-color: transparent; box-shadow: 0 0 0 5px transparent; }
+}
+.gr-post.is-flash { border-radius: 4px; animation: gr-post-flash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .gr-post.is-flash { animation: none; background-color: var(--flash); box-shadow: 0 0 0 5px var(--flash); } }
 .gr-post .gr-note-text { margin-top: 0; }
 .gr-thread-reply { margin: 8px 6px 0 0; border-top: 1px solid var(--border); padding-top: 6px; }
 .gr-reply { display: block; width: 100%; padding: 4px 0; text-align: left; color: var(--muted-fg); font-size: 13px; cursor: text; }
