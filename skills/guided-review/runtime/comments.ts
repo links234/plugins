@@ -759,7 +759,8 @@ async function goToAnswers(id: string) {
 // An answer of Claude's is unread until the reader looks at its thread: a click on its box, or on it in the bell's
 // list. What they have read is kept in this browser, like the review marks. The bell in the bar counts the threads
 // with an unread answer and opens a list of them, newest first; a click on one goes to it. Under them, the threads
-// whose answers the reader has read, the last read first, so one opened by mistake is still a click away.
+// whose answers the reader has read, the last read first, so one opened by mistake is still a click away. That part
+// folds: it opens folded while any answer is unread, so the unread ones show in full, and open when none is.
 const READ = 'gr:read', SEEN = 'gr:seen';
 const read = new Set<string>((() => { const got = store.get<string[]>(READ); return Array.isArray(got) ? got : []; })());
 /** When the reader last read an answer in each thread, by thread id. */
@@ -767,6 +768,8 @@ const seen = new Map<string, string>((() => {
   const got = store.get<[string, string][]>(SEEN);
   return Array.isArray(got) ? got.filter((x) => Array.isArray(x) && typeof x[0] === 'string' && typeof x[1] === 'string') : [];
 })());
+/** The reader's own fold of the Read part, until the list closes; null: folded while any answer is unread. */
+let readOpen: boolean | null = null;
 function readOnes() {
   return ctxs.flatMap((c) => sentOf(c)).filter((t) => seen.has(t.id) && !unreadIn(t).length && t.posts.some((p) => p.by === 'claude'))
     .sort((a, b) => (seen.get(a.id)! < seen.get(b.id)! ? 1 : -1));
@@ -815,18 +818,20 @@ function paintInbox(list = unread()) {
       h('span', { class: 'gist' }, h('b', { text: 'Claude ' }), plainText(last.text)),
       !done && posts.length > 1 ? h('span', { class: 'more', text: `${posts.length} new answers` }) : null);
   };
-  const old = readOnes();
+  const old = readOnes(), open = readOpen ?? !list.length;
   box.replaceChildren(h('div', { class: 'gr-inbox-scroll' },
     h('div', { class: 'gr-inbox-head' }, h('b', { text: 'Unread answers' }),
       list.length ? h('button', { class: 'k-btn is-ghost is-sm', type: 'button', 'data-inbox-all': '' }, 'Mark all read') : null),
     list.length ? h('div', { class: 'gr-inbox-list' }, ...list.map((x) => item(x)))
       : h('p', { class: 'gr-inbox-empty', text: old.length ? 'No unread answers.' : 'No unread answers. When Claude answers one of your comments, it shows here until you read it.' }),
-    old.length ? h('div', { class: 'gr-inbox-head is-sub' }, h('b', { text: 'Read' }), h('span', { text: 'last read first' })) : null,
-    old.length ? h('div', { class: 'gr-inbox-list', 'data-inbox-read': '' }, ...old.map((t) => item({ t, posts: t.posts.filter((p) => p.by === 'claude') }, true))) : null));
+    old.length ? h('button', { class: 'gr-inbox-head is-sub', type: 'button', 'data-inbox-fold': '', 'aria-expanded': String(open) },
+      h('span', { class: 'chev', html: ICON.down }), h('b', { text: 'Read' }), h('span', { class: 'n', text: String(old.length) }), h('span', { class: 'hint', text: 'last read first' })) : null,
+    old.length && open ? h('div', { class: 'gr-inbox-list', 'data-inbox-read': '' }, ...old.map((t) => item({ t, posts: t.posts.filter((p) => p.by === 'claude') }, true))) : null));
 }
 function setBell(open: boolean, focusBell = false) {
   const box = inbox();
   if (!box || open === bellOpen()) return;
+  readOpen = null;
   if (open) paintInbox();
   box.hidden = !open;
   for (const b of $$('[data-bell]')) b.setAttribute('aria-expanded', String(open));
@@ -1045,6 +1050,12 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   if (t.hasAttribute('data-bell')) { setBell(!bellOpen()); sound.play('toggle'); }
   else if (t.dataset.inbox) { setBell(false); void goToAnswers(t.dataset.inbox); sound.play('nav'); }
+  else if (t.hasAttribute('data-inbox-fold')) {
+    readOpen = t.getAttribute('aria-expanded') !== 'true';
+    paintInbox();
+    inbox()?.querySelector<HTMLElement>('[data-inbox-fold]')?.focus();
+    sound.play('toggle');
+  }
   else if (t.hasAttribute('data-inbox-all')) { for (const { t: th } of unread()) markRead(th.id); sound.play('select'); }
   else if (t.hasAttribute('data-notes-toggle')) { toggleNotes(); sound.play('toggle'); }
   else if (t.hasAttribute('data-note-file')) openFile(t.closest<HTMLElement>('.gr-file')!);
